@@ -79,6 +79,40 @@ def get_preprocessed_image(file_name):
     im = np.pad(im, pad_width=((0, pad_h), (0, pad_w), (0, 0)), mode='constant', constant_values=0)
     return np.expand_dims(im.astype(np.float32), 0), img_h, img_w
 
+def get_preprocessed_label(file_name, num_labels):
+    """ Reads an image from disk, preprocess by converting to array of same dimensions with a binary layer for each segmentation class.
+    """
+    img = Image.open(file_name).convert("RGBA")
+    img_array = np.array(img)[:,:,0] # Take only a single layer
+
+    # Pad to make 500 x 500
+    img_h, img_w = np.shape(img_array)
+    pad_h = 500 - img_h
+    pad_w = 500 - img_w
+    padded_im = np.pad(img_array, pad_width = ((0,pad_h), (0,pad_w)), mode="constant", constant_values=0)
+
+    res = np.zeros((500, 500, num_labels))
+    for i in range(500):
+        for j in range(500):
+            k = padded_im[i,j]
+            res[i,j,k] = 1
+
+    '''
+    # Check the resulting array
+    for i in range(num_labels):
+        print(i)
+        print(np.shape(res[:,:,i]))
+        f = res[:,:,i].flatten()
+        print(f)
+        s = 0
+        for elt in f:
+            if elt != 0:
+                s+=1
+        print("num nonzero: ", s)
+    '''
+    
+    res = res.reshape((-1, 500, 500, num_labels)) # Need to have 4 dimensions
+    return res, img_h, img_w
 
 def get_label_image(probs, img_h, img_w):
     """ Returns the label image (PNG with Pascal VOC colormap) given the probabilities.
