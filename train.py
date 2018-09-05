@@ -35,10 +35,10 @@ from keras import optimizers
 from keras.callbacks import ModelCheckpoint
 import pickle
 
-INPUT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/pascal_voc12/images_orig/"
-GT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/pascal_voc12/labels_orig/"
+INPUT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/horse_coarse/images_orig/"
+GT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/horse_coarse/labels_orig/"
 
-def prepare_training_data(img_list_path, im_file_name, label_file_name):
+def prepare_training_data(img_list_path, im_file_name, label_file_name, num_labels):
     """ Prepares image data for training crf-as-rnn network.
 
     @img_list_path (string): path to list containing training image names
@@ -59,7 +59,7 @@ def prepare_training_data(img_list_path, im_file_name, label_file_name):
 
         if i % 100 == 0:
             print("Processed ", i)
-        img_data, img_h, img_w = util.get_preprocessed_label(GT_DIR + name + ".png", 21)
+        img_data, img_h, img_w = util.get_preprocessed_label(GT_DIR + name + ".png", num_labels)
         labels.append(img_data)
         i+=1
 
@@ -101,8 +101,8 @@ def train(im_file_name, label_file_name):
     #model.load_weights(saved_model_path)
 
     # Compile model
-    adam = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    model.compile(loss='mean_squared_logarithmic_error', optimizer=adam)
+    adam = optimizers.Adam(lr=1e-5, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    model.compile(loss='categorical_crossentropy', optimizer=adam)
     
     # Start finetuning
     for i in range(len(inputs)):
@@ -111,9 +111,9 @@ def train(im_file_name, label_file_name):
         model.fit(x=inputs[i], y=labels[i], epochs=5, steps_per_epoch=1, callbacks=[checkpointer])
 
     # Save model weights
-    model.save_weights('voc12.h5')
+    model.save_weights('horse_coarse.h5')
 
 if __name__ == '__main__':
     image_fn, label_fn = "image_data", "label_data"
-    #prepare_training_data("./list/.txt", image_fn, label_fn)
+    prepare_training_data("/path/to/parts/list", image_fn, label_fn, 21)
     train(image_fn, label_fn)
