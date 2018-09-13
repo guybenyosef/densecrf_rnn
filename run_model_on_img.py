@@ -25,6 +25,7 @@ SOFTWARE.
 import sys
 sys.path.insert(1, './src')
 from crfrnn_model import get_crfrnn_model_def
+from fcn8_model import get_fcn8_model_def
 import util
 import os
 import pdb
@@ -39,7 +40,8 @@ def main(saved_model_path,input_file_path):
     # Download the model from https://goo.gl/ciEYZi
     #saved_model_path = 'crfrnn_keras_model.h5'
 
-    model = get_crfrnn_model_def()
+    #model = get_crfrnn_model_def()
+    model = get_fcn8_model_def()
     model.load_weights(saved_model_path)
 
     img_data, img_h, img_w = util.get_preprocessed_image(input_file_path)
