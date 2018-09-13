@@ -171,6 +171,8 @@ def fcn_8s():
     """ Returns Keras FCN-8 model definition.
 
       """
+    fcn32_flag = False
+
     inputs = Input(shape=(INPUT_SIZE, INPUT_SIZE, 3))
     # Start from VGG16 layers
     vgg16 = VGG16(weights='imagenet', include_top=False, input_tensor=inputs)
@@ -234,16 +236,17 @@ def fcn_8s():
     #                     kernel_initializer=Constant(bilinear_upsample_weights(32, nb_classes)))(score_7_4_cropped)
 
     # Creating the model:
-    # model = Model(inputs=inputs, outputs=score_7_4_3_up)
+    model = Model(inputs=inputs, outputs=score_7_4_3_up)
     # # -- and this is fcn-32: --
-    score7c_upsample_32 = Conv2DTranspose(filters=nb_classes,
-                                                 kernel_size=(64, 64),
-                                                 strides=(32, 32),
-                                                 padding='same',
-                                                 activation='sigmoid',
-                                                 kernel_initializer=Constant(bilinear_upsample_weights(32, nb_classes)),
-                                                 name="score_pool7c_upsample_32")(score7c)
-    model = Model(inputs=inputs, outputs=score7c_upsample_32)
+    if(fcn32_flag):
+        score7c_upsample_32 = Conv2DTranspose(filters=nb_classes,
+                                                     kernel_size=(64, 64),
+                                                     strides=(32, 32),
+                                                     padding='same',
+                                                     activation='sigmoid',
+                                                     kernel_initializer=Constant(bilinear_upsample_weights(32, nb_classes)),
+                                                     name="score_pool7c_upsample_32")(score7c)
+        model = Model(inputs=inputs, outputs=score7c_upsample_32)
 
 
     # Fixing weighs in lower layers
