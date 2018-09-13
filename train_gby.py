@@ -25,6 +25,8 @@ SOFTWARE.
 import sys
 sys.path.insert(1, './src')
 from crfrnn_model import get_crfrnn_model_def
+from fcn8_model import get_fcn8_model_def
+from fcn32_model_gby import fcn_32s
 import util
 from os import listdir
 from os.path import isfile, join
@@ -89,22 +91,30 @@ def train(im_file_name, label_file_name):
     saved_model_path = 'crfrnn_keras_model.h5'
 
     # Initialize model 
-    model = get_crfrnn_model_def()
+    # fcn8:
+    # model = get_fcn8_model_def(
+    # fcn32
+    model = fcn_32s()
+    # crfasarnn
+    #model = get_crfrnn_model_def()
     #model.load_weights(saved_model_path)
 
     # Compile model
     #adam = optimizers.Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    adam = optimizers.Adam(lr=1e-13, beta_1=0.99, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    #adam = optimizers.Adam(lr=1e-13, beta_1=0.99, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    #adam = optimizers.Adam(lr=1e-9, beta_1=0.99, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
     #model.compile(loss='mean_squared_error', optimizer=adam)
-    model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
+    #model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
+    #model.compile(loss='categorical_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
     #model.compile(loss=losses.sparse_categorical_crossentropy, optimizer=adam)
+    model.compile(loss='categorical_crossentropy', optimizer='sgd')
 
-
-
+    #model.fit(x=inputs, y=labels, batch_size=1)
     # Start finetuning
     #for i in range(len(inputs)):
-    for i in range(100):
+    for i in range(1000):
         print("img ", i)
+    #    model.fit(x=inputs[i], y=labels[i], epochs=3, steps_per_epoch=1)
         model.fit(x=inputs[i], y=labels[i], epochs=1, steps_per_epoch=1)
 
 
