@@ -32,12 +32,20 @@ import numpy as np
 from scipy import misc
 from PIL import Image
 from keras import optimizers
+from keras.callbacks import ModelCheckpoint
 import pickle
 
-INPUT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/pascal_voc12/images_orig/"
-GT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/pascal_voc12/labels_orig/"
+INPUT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/horse_coarse/images_orig/"
+GT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/horse_coarse/labels_orig/"
 
-def prepare_training_data(img_list_path, im_file_name, label_file_name):
+def prepare_training_data(img_list_path, im_file_name, label_file_name, num_labels):
+    """ Prepares image data for training crf-as-rnn network.
+
+    @img_list_path (string): path to list containing training image names
+    @im_file_name (string): name of file to dump raw image data in
+    @label_file_name (string): name of file to dump image label data in
+    TODO: add parameter for number of labels
+    """
     with open(img_list_path) as f:
         content = f.readlines()
     im_list = sorted([x[42:-5] for x in content]) # Slicing specific to pascal voc trainval lists
@@ -51,57 +59,61 @@ def prepare_training_data(img_list_path, im_file_name, label_file_name):
 
         if i % 100 == 0:
             print("Processed ", i)
-        img_data, img_h, img_w = util.get_preprocessed_label(GT_DIR + name + ".png", 21)
+        img_data, img_h, img_w = util.get_preprocessed_label(GT_DIR + name + ".png", num_labels)
         labels.append(img_data)
         i+=1
 
     '''
     # Using pickle
-    im_file = open(im_file_name, 'wb')
+    im_file = open(im_file_name + ".p", 'wb')
     pickle.dump(inputs,im_file)
     im_file.close()
-    label_file = open(label_file_name, 'wb')
+    label_file = open(label_file_name + ".p", 'wb')
     pickle.dump(labels, label_file)
     label_file.close()
     '''
 
     # Using numpy
-    np.save("image_data.npy", inputs)
-    np.save("label_data.npy", labels)
+    np.save(im_file_name + ".npy", inputs)
+    np.save(label_file_name + ".npy", labels)
         
 def train(im_file_name, label_file_name):
-    # Load img and label data
-    '''    
-    # Using pickle
-    input_file = open(im_file_name, 'rb')
-    inputs = pickle.load(input_file)
-    label_file = open(label_file_name, 'rb')
-    labels = pickle.load(label_file)
-    '''
+    """ Trains crf-as-rnn network.
 
-    # Using numpy    
-    inputs = np.load("image_data.npy")
-    labels = np.load("label_data.npy")
+    @im_file_name (string): name of file containing raw image data
+    @label_file_name (string): name of file containing image label data
+    TODO: add parameter for initial weights
+    """
+    # Load img and label data
     
-    # Download the model from https://goo.gl/ciEYZi
-    saved_model_path = 'crfrnn_keras_model.h5'
+    # Using pickle
+    input_file = open(im_file_name + ".p", 'rb')
+    inputs = pickle.load(input_file)
+    #label_file = open(label_file_name + ".p", 'rb')
+    #labels = pickle.load(label_file)
+
+    # Using numpy
+    #inputs = np.load(im_file_name + ".npy")
+    labels = np.load(label_file_name + ".npy")
 
     # Initialize model 
     model = get_crfrnn_model_def()
-    model.load_weights(saved_model_path)
+    #model.load_weights(saved_model_path)
 
     # Compile model
-    adam = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-    model.compile(loss='mean_squared_error', optimizer=adam)
+    adam = optimizers.Adam(lr=1e-5, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
+    model.compile(loss='categorical_crossentropy', optimizer=adam)
     
     # Start finetuning
     for i in range(len(inputs)):
-        model.fit(x=inputs[i], y=labels[i])
+        print("img ", i)
+        checkpointer = ModelCheckpoint(filepath='./checkpoint/weights_%d.h5' % i, verbose=1, save_best_only=False, save_weights_only=True, period=5)
+        model.fit(x=inputs[i], y=labels[i], epochs=5, steps_per_epoch=1, callbacks=[checkpointer])
 
     # Save model weights
-    model.save_weights('voc12_weights')
+    model.save_weights('horse_coarse.h5')
 
 if __name__ == '__main__':
-    image_fn, label_fn = "image_data.npy", "label_data.npy"
-    prepare_training_data("./list/train.txt", image_fn, label_fn)
+    image_fn, label_fn = "image_data", "label_data"
+    prepare_training_data("/path/to/parts/list", image_fn, label_fn, 21)
     train(image_fn, label_fn)
