@@ -7,7 +7,7 @@ import numpy as np
 #from keras import backend as K
 import matplotlib.pyplot as plt
 import pdb
-from models_gby import fcn_32s_orig,fcn_32s,fcn_8s,fcn_VGG16_32s_crfrnn,fcn_8s_take2,fcn_VGG16_8s_crfrnn # FCN8
+from models_gby import fcn_32s_orig,fcn_32s,fcn_VGG16_32s_crfrnn,fcn_8s_take2,fcn_VGG16_8s_crfrnn,fcn_RESNET50_32s,fcn_RESNET50_8s,fcn_8s_Sadeep
 from crfrnn_model import get_crfrnn_model_def
 from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,IoU_ver2,give_color_to_seg_img
 
@@ -26,7 +26,7 @@ import argparse
 
 RES_DIR = "/storage/gby/semseg/"
 
-INPUT_SIZE = 224 #500 #224
+INPUT_SIZE = 500 #500 #224
 
 # ===========================
 # Main
@@ -35,7 +35,7 @@ if __name__ == '__main__':
 
     # Parse args:
     # -----------
-    # parser = argparse.ArgumentParser()
+    # parser = argparse.ArgumentParser()who
     # parser.add_argument('test_data')
     # parser.add_argument('test_data')
     # args = parser.parse_args()
@@ -74,14 +74,18 @@ if __name__ == '__main__':
     # Split between training and testing data:
     # -----------------------------------------
     train_rate = 0.85
-    index_train = np.random.choice(X.shape[0], int(X.shape[0] * train_rate), replace=False)
-    index_test = list(set(range(X.shape[0])) - set(index_train))
+    allow_randomness = False
 
-    # X, Y = shuffle(X, Y)
-    X_train, y_train = X[index_train], Y[index_train]
-    X_test, y_test = X[index_test], Y[index_test]
-    print(X_train.shape, y_train.shape)
-    print(X_test.shape, y_test.shape)
+    if allow_randomness:
+        index_train = np.random.choice(X.shape[0], int(X.shape[0] * train_rate), replace=False)
+        index_test = list(set(range(X.shape[0])) - set(index_train))
+        X, Y = shuffle(X, Y)
+        X_train, y_train = X[index_train], Y[index_train]
+        X_test, y_test = X[index_test], Y[index_test]
+    else:
+        index_train = int(X.shape[0] * train_rate)
+        X_train, y_train = X[0:index_train], Y[0:index_train]
+        X_test, y_test = X[index_train:-1], Y[index_train:-1]
 
     X, Y = X_test, y_test
 
@@ -100,12 +104,16 @@ if __name__ == '__main__':
 
     # Constructing model:
     # --------------------
-    model_names = list({'fcn32s_orig',
-                        'fcn32s',
-                        'fcn8s'})
+    #names = {'fcn32s_orig','fcn32s','fcn8s'}
+    names = {'fcn8s'}
+    #names = {'fcn32s','resnet50fcn32s','fcn8s'}
+    #names = {'resnet50fcn32s'}
+
+    model_names = list(names)
 
     for model_name in model_names:
-        model_path_name = '/storage/gby/semseg/streets_weights_'+model_name+'_200ep'
+        model_path_name = '/storage/gby/semseg/streets_weights_'+model_name+'_Sadeep_10ep'
+      #  model_path_name = '/storage/gby/semseg/streets_weights_' + model_name + '_100ep'
 
         if model_name == 'fcn32s_orig':
             model = fcn_32s_orig(nb_classes)
@@ -114,10 +122,11 @@ if __name__ == '__main__':
             model = fcn_32s(INPUT_SIZE, nb_classes)
 
         elif model_name == 'fcn8s':
-            model = fcn_8s_take2(INPUT_SIZE, nb_classes)
+            #model = fcn_8s_take2(INPUT_SIZE, nb_classes)
+            model = fcn_8s_Sadeep(nb_classes)
 
-        elif model_name == 'future_model1':
-            print('TODO')
+        elif model_name == 'resnet50fcn32s':
+            model = fcn_RESNET50_32s(INPUT_SIZE, nb_classes)
 
         else:
             print('ERROR: model name does not exist..')
@@ -143,25 +152,35 @@ if __name__ == '__main__':
         shape = (INPUT_SIZE, INPUT_SIZE)
         n_classes = nb_classes # 10
 
-        for i in range(1):
-            img_is = (X[i] + 1) * (255.0 / 2)
-            seg = y_predi[i]
-            segtest = y_testi[i]
+        num_examples_to_plot = 4
 
-            fig = plt.figure(figsize=(10, 10))
-            ax = fig.add_subplot(1, 3, 1)
+        fig = plt.figure(figsize=(10, 3*num_examples_to_plot))
+
+        for i in range(num_examples_to_plot):
+
+            img_indx = i*4
+            img_is = (X_test[img_indx] + 1) * (255.0 / 2)
+            seg = y_predi[img_indx]
+            segtest = y_testi[img_indx]
+
+            ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 1)
             ax.imshow(img_is / 255.0)
-            ax.set_title("original")
+            if i == 0:
+                ax.set_title("original")
 
-            ax = fig.add_subplot(1, 3, 2)
+            ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 2)
             ax.imshow(give_color_to_seg_img(seg, n_classes))
-            ax.set_title("predicted class")
+            if i == 0:
+                ax.set_title("predicted class")
 
-            ax = fig.add_subplot(1, 3, 3)
+            ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 3)
             ax.imshow(give_color_to_seg_img(segtest, n_classes))
-            ax.set_title("true class")
-            #plt.show()
+            if i == 0:
+                ax.set_title("true class")
+
         plt.savefig('examples_%s.png' % model_name)
+
+
 
 
 
