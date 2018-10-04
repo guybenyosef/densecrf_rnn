@@ -9,6 +9,7 @@ from utils_gby import bilinear_upsample_weights
 import sys
 sys.path.insert(1, './src')
 from crfrnn_layer import CrfRnnLayer
+from crfrnn_layer_sp import CrfRnnLayerSP
 
 # -----------------------
 # Model design
@@ -297,10 +298,11 @@ def fcn_8s_Sadeep_crfrnn(nb_classes):
     INPUT_SIZE = 500
 
     fcn = fcn_8s_Sadeep(nb_classes)
-    saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_10ep'
+    saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_100ep'
     fcn.load_weights(saved_model_path)
 
     inputs = fcn.layers[0].output
+    seg_input = fcn.layers[0].output
     # Add plenty of zero padding
     #inputs = ZeroPadding2D(padding=(100, 100))(inputs)
 
@@ -310,13 +312,23 @@ def fcn_8s_Sadeep_crfrnn(nb_classes):
 
     # Adding the crfrnn layer:
     height, weight = INPUT_SIZE, INPUT_SIZE
-    crfrnn_output = CrfRnnLayer(image_dims=(height, weight),
-                             num_classes=nb_classes,
-                             theta_alpha=160.,
-                             theta_beta=3.,
-                             theta_gamma=3.,
-                             num_iterations=5, # 10 in test time, 5 in train time
-                             name='crfrnn')([fcn_score, inputs])
+    # crfrnn_output = CrfRnnLayer(image_dims=(height, weight),
+    #                          num_classes=nb_classes,
+    #                          theta_alpha=160.,
+    #                          theta_beta=3.,
+    #                          theta_gamma=3.   ,
+    #                          num_iterations=0, # 10 in test time, 5 in train time
+    #                          name='crfrnn')([fcn_score, inputs])
+
+    crfrnn_output = CrfRnnLayerSP(image_dims=(height, weight),
+                         num_classes=nb_classes,
+                         theta_alpha=160.,
+                         theta_beta=3.,
+                         theta_gamma=3.,
+                         num_iterations=0, #5
+                         bil_rate = 0.5, #add for the segmentation
+                         theta_alpha_seg = 30, #add for the segmentation
+                         name='crfrnn')([fcn_score, inputs, seg_input]) #set num_iterations to 0 if we do not want crf
 
     model = Model(inputs=inputs, output=crfrnn_output, name='fcn8_Sadeep_crfrnn_net')
 
