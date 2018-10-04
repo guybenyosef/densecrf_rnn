@@ -11,10 +11,10 @@ import numpy as np
 #from keras import backend as K
 import matplotlib.pyplot as plt
 import pdb
-#from models_gby import fcn_32s_orig,fcn_32s,fcn_VGG16_32s_crfrnn,fcn_8s_take2,fcn_VGG16_8s_crfrnn,fcn_RESNET50_32s,fcn_RESNET50_8s,fcn_RESNET50_8s_crfrnn,fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn,
+from models_gby import fcn_32s_orig,fcn_32s,fcn_VGG16_32s_crfrnn,fcn_8s_take2,fcn_VGG16_8s_crfrnn,fcn_RESNET50_32s,fcn_RESNET50_8s,fcn_RESNET50_8s_crfrnn,fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
 #from crfrnn_model import get_crfrnn_model_def
-from models_gby import fcn_8s_Sadeep_crfrnn
-from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,IoU_ver2,give_color_to_seg_img
+#from models_gby import fcn_8s_Sadeep_crfrnn
+from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,IoU_ver2,give_color_to_seg_img,visualize_conv_filters
 
 ## Import usual libraries
 import os
@@ -56,8 +56,8 @@ if __name__ == '__main__':
 
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     config = tf.ConfigProto()
-    config.gpu_options.per_process_gpu_memory_fraction = 0.95
-    config.gpu_options.visible_device_list = "2"
+    config.gpu_options.per_process_gpu_memory_fraction = 0.70 # default: "0.95"
+    config.gpu_options.visible_device_list = "2" # default: "2"
     set_session(tf.Session(config=config))
 
     print("python {}".format(sys.version))
@@ -129,36 +129,42 @@ if __name__ == '__main__':
     model = fcn_8s_Sadeep_crfrnn(nb_classes)
 
     # if resuming training:
-    saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_5000ep' #'crfrnn_keras_model.h5'
-    saved_model_path = '/storage/gby/semseg/voc12_weights'
+    saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_500ep' #'crfrnn_keras_model.h5'
+    #saved_model_path = '/storage/gby/semseg/voc12_weights'
     #saved_model_path = 'crfrnn_keras_model.h5'
     #model.load_weights(saved_model_path)
 
     model.summary()
 
+    visualize_filters_flag = True
+    layer_name = 'crfrnn' #'score2'
+    if visualize_filters_flag:
+        visualize_conv_filters(model, INPUT_SIZE, layer_name)
+
+
     # Training starts here:
     # ----------------------
-#    sgd = optimizers.SGD(lr=1E-2, decay=5 ** (-4), momentum=0.9, nesterov=True)
-    sgd = optimizers.SGD(lr=1e-13, momentum=0.99)
-    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-    #model.compile(loss="categorical_crossentropy", optimizer='sgd', metrics=['accuracy'])
+    #sgd = optimizers.SGD(lr=1E-2, decay=5 ** (-4), momentum=0.9, nesterov=True)
+    #sgd = optimizers.SGD(lr=1e-13, momentum=0.99)
+    #model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    model.compile(loss="categorical_crossentropy", optimizer='sgd', metrics=['accuracy'])
     #model.compile(loss="binary_crossentropy", optimizer='sgd', metrics=['accuracy'])
-#    model.compile(loss='categorical_crossentropy', optimizer=optimizers.Adam(lr=0.0001), metrics=['accuracy'])
+    #model.compile(loss='categorical_crossentropy', optimizer=optimizers.Adam(lr=0.0001), metrics=['accuracy'])
     #model.compile(loss="categorical_crossentropy", optimizer='Adadelta', metrics=['accuracy'])
 
-    # hist1 = model.fit(X_train, y_train,
-    #                   validation_data=(X_test, y_test),
-    #                   batch_size=32, epochs=50, verbose=2)
-
-    # for crfrnn:
     hist1 = model.fit(X_train, y_train,
                       validation_data=(X_test, y_test),
-                      batch_size=1, epochs=100, verbose=2)
+                      batch_size=6, epochs=400, verbose=2)
+
+    # for crfrnn:
+    # hist1 = model.fit(X_train, y_train,
+    #                   validation_data=(X_test, y_test),
+    #                   batch_size=1, epochs=3, verbose=1)
 
     # save model:
     model.save_weights(RES_DIR + 'voc12_weights')
 
-    save_graphics_mode = True
+    save_graphics_mode = False
     print_IoU_flag = False
 
     # Plot/save the change in loss over epochs:
