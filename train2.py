@@ -137,7 +137,7 @@ if __name__ == '__main__':
     model.summary()
 
     visualize_filters_flag = True
-    layer_name = 'crfrnn' #'score2'
+    layer_name = 'score2' # 'crfrnn' 'score2'
     if visualize_filters_flag:
         visualize_conv_filters(model, INPUT_SIZE, layer_name)
 

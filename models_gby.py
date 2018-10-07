@@ -298,7 +298,7 @@ def fcn_8s_Sadeep_crfrnn(nb_classes):
     INPUT_SIZE = 500
 
     fcn = fcn_8s_Sadeep(nb_classes)
-    saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_100ep'
+    saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_500ep'
     fcn.load_weights(saved_model_path)
 
     inputs = fcn.layers[0].output
