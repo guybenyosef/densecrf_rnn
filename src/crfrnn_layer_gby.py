@@ -19,10 +19,10 @@ def _potts_model_initializer(shape):
 
 class CrfRnnLayer_GBY(Layer):
 
-    def __init__(self, num_classes, num_of_iterations, **kwargs):
+    def __init__(self, image_dims, num_classes, theta_alpha, theta_beta, theta_gamma, num_iterations, **kwargs):
         # params
         self.num_classes = num_classes
-        self.num_of_iterations = num_of_iterations
+        self.num_of_iterations = num_iterations
         self.image_dims = image_dims
         self.theta_alpha = theta_alpha
         self.theta_beta = theta_beta
@@ -112,9 +112,6 @@ class CrfRnnLayer_GBY(Layer):
             Q = tf.transpose(tf.reshape(Q, (1, c, h, w)), perm=(0, 2, 3, 1))
 
         return Q
-
-
-
 
 
     # compute_output_shape(input_shape):
