@@ -1,6 +1,6 @@
 # here is my own implementatino of the crfrnn Keras layer
 
-
+import tensorflow as tf
 from keras import backend as K
 from keras.engine.topology import Layer
 
@@ -23,6 +23,13 @@ class CrfRnnLayer_GBY(Layer):
         # params
         self.num_classes = num_classes
         self.num_of_iterations = num_of_iterations
+        self.image_dims = image_dims
+        self.theta_alpha = theta_alpha
+        self.theta_beta = theta_beta
+        self.theta_gamma = theta_gamma
+        self.spatial_kernel = None
+        self.bilateral_kernel = None
+        self.compatibility_matrix = None
 
 
         super(CrfRnnLayer_GBY, self).__init__(**kwargs)
@@ -55,25 +62,32 @@ class CrfRnnLayer_GBY(Layer):
     # call(x):
     # this is where the layer's logic lives.
     # Unless you want your layer to support masking, you only have to care about the first argument passed to call: the input tensor.
-    def call(self, x):
+    def call(self, inputs):
 
         unaries = tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1))  # the fcn_scores
         rgb = tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1))  # the raw rgb
         # pdb.set_trace()
         c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
 
-        self.Mui = compute_mui(rgb)
-        self.F = compute_F(rgb)
+        all_ones = np.ones((c, h, w), dtype=np.float32)
 
-        # Normalize Q:
-        Z[i] = sum(exp(U(i,l)))
+        # Prepare filter normalization coefficients
+        spatial_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=False,
+                                                          theta_gamma=self.theta_gamma)
+        bilateral_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=True,
+                                                            theta_alpha=self.theta_alpha,
+                                                            theta_beta=self.theta_beta)
+
         Q  = unaries
 
         # Iterate:
-        for ii in range (self.num_of_iterations)
+        for ii in range (self.num_of_iterations):
+            # Normalizing Q:
+            softmax_out = tf.nn.softmax(Q, 0)
+
             # message passing with Gaussian filters:
             # compute filter responses:
-
+            #
             # Spatial filtering (a.k.a the 'smoothness kernel')
             spatial_out = custom_module.high_dim_filter(softmax_out, rgb, bilateral=False,
                                                         theta_gamma=self.theta_gamma)
@@ -85,15 +99,17 @@ class CrfRnnLayer_GBY(Layer):
                                                           theta_beta=self.theta_beta)
             bilateral_out = bilateral_out / bilateral_norm_vals
 
-            Q = Q*self.bilateral_kernel(F,F)
             # weighting filter outputs:
-            Q = K.dot(self.spatial_kernel, Q)
+            weighting_out = K.dot(self.spatial_kernel, tf.reshape(spatial_out, (c, -1))) + K.dot(self.bilateral_kernel, tf.reshape(bilateral_out, (c, -1)))
+
             # Compatability transform:
-            Q = Q * self.Mui
+            Compatability_out = K.dot(self.compatibility_matrix, weighting_out)
+
             # Adding unary potentials:
-            Q = U - Q
-            # Normalizing:
-            Q = (1/Z)*exp(Q)
+            Q = unaries -  tf.reshape(Compatability_out, (c, h, w))
+
+            # reshape:
+            Q = tf.transpose(tf.reshape(Q, (1, c, h, w)), perm=(0, 2, 3, 1))
 
         return Q
 
@@ -105,4 +121,4 @@ class CrfRnnLayer_GBY(Layer):
     # in case your layer modifies the shape of its input, you should specify here the shape transformation logic.
     # This allows Keras to do automatic shape inference.
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.output_dim)
+        return input_shape
