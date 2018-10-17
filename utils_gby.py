@@ -3,7 +3,7 @@
 import pdb
 from keras import backend as K
 from keras.applications.vgg16 import preprocess_input, decode_predictions
-from scipy.misc import imsave
+# [DEP] from scipy.misc import imsave
 #from keras.applications.resnet50 import preprocess_input, decode_predictions
 from PIL import Image
 import numpy as np
@@ -348,4 +348,4 @@ def visualize_conv_filters(model, INPUT_SIZE, layer_name):
             height_margin: height_margin + img_height, :] = img
 
     # save the result to disk
-    imsave('%s_%s_stitched_filters_%dx%d.png' % (model.name,layer_name,n, n), stitched_filters)
+   # imsave('%s_%s_stitched_filters_%dx%d.png' % (model.name,layer_name,n, n), stitched_filters)
