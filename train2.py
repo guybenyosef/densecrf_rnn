@@ -9,7 +9,7 @@ import numpy as np
 #from keras.optimizers import Adam
 #from keras.optimizers import SGD
 #from keras import backend as K
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import pdb
 from models_gby import fcn_32s_orig,fcn_32s,fcn_VGG16_32s_crfrnn,fcn_8s_take2,fcn_VGG16_8s_crfrnn,fcn_RESNET50_32s,fcn_RESNET50_8s,fcn_RESNET50_8s_crfrnn,fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
 #from crfrnn_model import get_crfrnn_model_def
@@ -28,6 +28,32 @@ from sklearn.utils import shuffle
 from keras import optimizers
 import argparse
 import pickle
+from keras.optimizers import Adam
+from weighted_categorical_crossentropy import weighted_loss
+
+# Median Frequency Alpha Coefficients
+coefficients = {0:0.0237995754847,
+                1:0.144286494916,
+                2:0.038448897913,
+                3:1.33901803472,
+                4:1.0,
+                5:0.715098627127,
+                6:4.20827446939,
+                7:1.58754122255,
+                8:0.0551054437019,
+                9:0.757994265912,
+                10:0.218245600783,
+                11:0.721125616748
+                # 12:6.51048559366,
+                # 13:0.125434198729,
+                # 14:3.27995580458,
+                # 15:3.72813940546,
+                # 16:3.76817843552,
+                # 17:8.90686657342,
+                # 18:2.12162414027,
+                # 19:0.
+                }
+coefficients = [key for index,key in coefficients.iteritems()]
 
 ## location of VGG weights
 VGG_Weights_path = "../FacialKeypoint/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5"
@@ -93,9 +119,9 @@ if __name__ == '__main__':
         X_train, y_train = X[index_train], Y[index_train]
         X_test, y_test = X[index_test], Y[index_test]
     else:
-        index_train = int(X.shape[0] * train_rate)
+        index_train = int(X.shape[0] * train_rate) #  NOTE
         X_train, y_train = X[0:index_train], Y[0:index_train]
-        X_test, y_test = X[index_train:-1], Y[index_train:-1]
+        X_test, y_test = X[index_train:-1], Y[index_train:-1]  # NOTE -1
 
 
     print(X_train.shape, y_train.shape)
@@ -136,7 +162,7 @@ if __name__ == '__main__':
 
     model.summary()
 
-    visualize_filters_flag = True
+    visualize_filters_flag = False
     layer_name = 'score2' # 'crfrnn' 'score2'
     if visualize_filters_flag:
         visualize_conv_filters(model, INPUT_SIZE, layer_name)
@@ -146,20 +172,25 @@ if __name__ == '__main__':
     # ----------------------
     #sgd = optimizers.SGD(lr=1E-2, decay=5 ** (-4), momentum=0.9, nesterov=True)
     #sgd = optimizers.SGD(lr=1e-13, momentum=0.99)
+#   adm = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001)
     #model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-    model.compile(loss="categorical_crossentropy", optimizer='sgd', metrics=['accuracy'])
+ #   model.compile(loss="categorical_crossentropy", optimizer=adm, metrics=['accuracy'])
     #model.compile(loss="binary_crossentropy", optimizer='sgd', metrics=['accuracy'])
     #model.compile(loss='categorical_crossentropy', optimizer=optimizers.Adam(lr=0.0001), metrics=['accuracy'])
     #model.compile(loss="categorical_crossentropy", optimizer='Adadelta', metrics=['accuracy'])
 
-    hist1 = model.fit(X_train, y_train,
-                      validation_data=(X_test, y_test),
-                      batch_size=6, epochs=400, verbose=2)
+    model.compile(loss=weighted_loss(nb_classes, coefficients),
+                  optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001),
+                  metrics=['accuracy'])
 
-    # for crfrnn:
     # hist1 = model.fit(X_train, y_train,
     #                   validation_data=(X_test, y_test),
-    #                   batch_size=1, epochs=3, verbose=1)
+    #                   batch_size=6, epochs=400, verbose=2)
+
+    # for crfrnn:
+    hist1 = model.fit(X_train, y_train,
+                      validation_data=(X_test, y_test),
+                      batch_size=1, epochs=2, verbose=1)
 
     # save model:
     model.save_weights(RES_DIR + 'voc12_weights')
