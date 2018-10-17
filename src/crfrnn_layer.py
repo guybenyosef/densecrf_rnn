@@ -27,7 +27,7 @@ import tensorflow as tf
 from keras.engine.topology import Layer
 import high_dim_filter_loader
 custom_module = high_dim_filter_loader.custom_module
-
+import pdb
 
 def _diagonal_initializer(shape):
     return np.eye(shape[0], shape[1], dtype=np.float32)
@@ -81,9 +81,10 @@ class CrfRnnLayer(Layer):
         super(CrfRnnLayer, self).build(input_shape)
 
     def call(self, inputs):
-        unaries = tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1))
-        rgb = tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1))
 
+        unaries = tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1)) # the fcn_scores
+        rgb = tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1)) # the raw rgb
+        #pdb.set_trace()
         c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
         all_ones = np.ones((c, h, w), dtype=np.float32)
 
@@ -94,6 +95,8 @@ class CrfRnnLayer(Layer):
                                                             theta_alpha=self.theta_alpha,
                                                             theta_beta=self.theta_beta)
         q_values = unaries
+        # for i in range(1):
+        #     q_values = tf.Print(q_values, [q_values[i]], message="unaries first 500 ", summarize=500)
 
         for i in range(self.num_iterations):
             softmax_out = tf.nn.softmax(q_values, 0)
@@ -121,6 +124,10 @@ class CrfRnnLayer(Layer):
             # Adding unary potentials
             pairwise = tf.reshape(pairwise, (c, h, w))
             q_values = unaries - pairwise
+            #pdb.set_trace()
+            # for i in range(1):
+            #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
+            # pdb.set_trace()
 
         return tf.transpose(tf.reshape(q_values, (1, c, h, w)), perm=(0, 2, 3, 1))
 

@@ -28,14 +28,13 @@ from keras.layers import Conv2D, MaxPooling2D, Input, ZeroPadding2D, \
 from crfrnn_layer import CrfRnnLayer
 
 
-def get_crfrnn_model_def():
+def get_crfrnn_model_def(nb_classes = 21):
     """ Returns Keras CRF-RNN model definition.
 
     Currently, only 500 x 500 images are supported. However, one can get this to
     work with different image sizes by adjusting the parameters of the Cropping2D layers
     below.
     """
-
     channels, height, weight = 3, 500, 500
 
     # Input
@@ -80,35 +79,37 @@ def get_crfrnn_model_def():
     x = Dropout(0.5)(x)
     x = Conv2D(4096, (1, 1), activation='relu', padding='valid', name='fc7')(x)
     x = Dropout(0.5)(x)
-    x = Conv2D(21, (1, 1), padding='valid', name='score-fr')(x)
+    x = Conv2D(nb_classes, (1, 1), padding='valid', name='score-fr')(x)
 
     # Deconvolution
-    score2 = Conv2DTranspose(21, (4, 4), strides=2, name='score2')(x)
+    score2 = Conv2DTranspose(nb_classes, (4, 4), strides=2, name='score2')(x)
 
     # Skip connections from pool4
-    score_pool4 = Conv2D(21, (1, 1), name='score-pool4')(pool4)
+    score_pool4 = Conv2D(nb_classes, (1, 1), name='score-pool4')(pool4)
     score_pool4c = Cropping2D((5, 5))(score_pool4)
     score_fused = Add()([score2, score_pool4c])
-    score4 = Conv2DTranspose(21, (4, 4), strides=2, name='score4', use_bias=False)(score_fused)
+    score4 = Conv2DTranspose(nb_classes, (4, 4), strides=2, name='score4', use_bias=False)(score_fused)
 
     # Skip connections from pool3
-    score_pool3 = Conv2D(21, (1, 1), name='score-pool3')(pool3)
+    score_pool3 = Conv2D(nb_classes, (1, 1), name='score-pool3')(pool3)
     score_pool3c = Cropping2D((9, 9))(score_pool3)
 
     # Fuse things together
     score_final = Add()([score4, score_pool3c])
 
     # Final up-sampling and cropping
-    upsample = Conv2DTranspose(21, (16, 16), strides=8, name='upsample', use_bias=False)(score_final)
+    upsample = Conv2DTranspose(nb_classes, (16, 16), strides=8, name='upsample', use_bias=False)(score_final)
     upscore = Cropping2D(((31, 37), (31, 37)))(upsample)
 
     output = CrfRnnLayer(image_dims=(height, weight),
-                         num_classes=21,
+                         num_classes=nb_classes,
                          theta_alpha=160.,
                          theta_beta=3.,
                          theta_gamma=3.,
                          num_iterations=10,
                          name='crfrnn')([upscore, img_input])
+
+    
 
     # Build the model
     model = Model(img_input, output, name='crfrnn_net')
