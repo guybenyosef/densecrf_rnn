@@ -264,7 +264,7 @@ def fcn_VGG16_8s_crfrnn(INPUT_SIZE,nb_classes):
       """
     fcn = fcn_8s_take2(INPUT_SIZE,nb_classes)
     saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_5000ep'
-    fcn.load_weights(saved_model_path)
+    #fcn.load_weights(saved_model_path)
 
     inputs = fcn.layers[0].output
     # Add plenty of zero padding
@@ -279,7 +279,7 @@ def fcn_VGG16_8s_crfrnn(INPUT_SIZE,nb_classes):
     crfrnn_output = CrfRnnLayer(image_dims=(height, weight),
                              num_classes=nb_classes,
                              theta_alpha=160.,
-                             theta_beta=3.,
+                             theta_beta=90.,   #3.
                              theta_gamma=3.,
                              num_iterations=5, # 10 in test time, 5 in train time
                              name='crfrnn')([fcn_score, inputs])
@@ -300,7 +300,7 @@ def fcn_8s_Sadeep_crfrnn(nb_classes):
 
     fcn = fcn_8s_Sadeep(nb_classes)
     saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_500ep'
-    #fcn.load_weights(saved_model_path)
+    fcn.load_weights(saved_model_path)
 
     inputs = fcn.layers[0].output
     #seg_input = fcn.layers[0].output
@@ -456,7 +456,7 @@ def fcn_RESNET50_8s(INPUT_SIZE,nb_classes):
 
     # Fuse scores
     score_pred16_pred32 = Add()([score_pred32_upsample, score_pred16_upsample])
-    score_pred8_pred16_pred32 = Add()([score_pred16_pred32, score_pred8_upsample])
+    score_pred8_pred16_pred32 = Add(name='add_pred8_pred16_pred32')([score_pred16_pred32, score_pred8_upsample])
 
     output = (Activation('softmax'))(score_pred8_pred16_pred32)
 
@@ -470,19 +470,21 @@ def fcn_RESNET50_8s_crfrnn(INPUT_SIZE,nb_classes):
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
     saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_50ep'
-    fcn.load_weights(saved_model_path)
+    #fcn.load_weights(saved_model_path)
 
     inputs = fcn.layers[0].output
-    fcn_score = fcn.output
 
-    # Adding the crfrnn layer:mv
+    #fcn_score = fcn.output
+    fcn_score = fcn.get_layer('add_pred8_pred16_pred32').output
+
+    # Adding the crfrnn layer:
     height, weight = INPUT_SIZE, INPUT_SIZE
     crfrnn_output = CrfRnnLayer(image_dims=(height, weight),
                                 num_classes=nb_classes,
                                 theta_alpha=160.,
-                                theta_beta=3.,
+                                theta_beta=90.,
                                 theta_gamma=3.,
-                                num_iterations=10,  # 10
+                                num_iterations=5,  # 10
                                 name='crfrnn')([fcn_score, inputs])
 
     model = Model(inputs=inputs, output=crfrnn_output, name='fcn8_Resnet50_crfrnn_net')

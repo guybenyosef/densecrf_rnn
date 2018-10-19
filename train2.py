@@ -53,14 +53,17 @@ coefficients = {0:0.0237995754847,
                 # 18:2.12162414027,
                 # 19:0.
                 }
-coefficients = [key for index,key in coefficients.iteritems()]
+# for python 2.7:
+#coefficients = [key for index,key in coefficients.iteritems()]
+#python 3:
+coefficients = [key for index,key in coefficients.items()]
 
 ## location of VGG weights
 VGG_Weights_path = "../FacialKeypoint/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5"
 
 RES_DIR = "/storage/gby/semseg/"
 
-INPUT_SIZE = 500# #500 #224
+INPUT_SIZE = 224# #500 #224 #512
 
 # ===========================
 # Main
@@ -150,9 +153,9 @@ if __name__ == '__main__':
     #model = fcn_32s_orig(nb_classes)
     #model = fcn_RESNET50_32s(INPUT_SIZE,nb_classes)
     #model = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
-    #model = fcn_RESNET50_8s_crfrnn(INPUT_SIZE, nb_classes)
+    model = fcn_RESNET50_8s_crfrnn(INPUT_SIZE, nb_classes)
     #model = fcn_8s_Sadeep(nb_classes)
-    model = fcn_8s_Sadeep_crfrnn(nb_classes)
+    #model = fcn_8s_Sadeep_crfrnn(nb_classes)
 
     # if resuming training:
     saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_500ep' #'crfrnn_keras_model.h5'
@@ -190,7 +193,7 @@ if __name__ == '__main__':
     # for crfrnn:
     hist1 = model.fit(X_train, y_train,
                       validation_data=(X_test, y_test),
-                      batch_size=1, epochs=2, verbose=1)
+                      batch_size=1, epochs=50, verbose=1)
 
     # save model:
     model.save_weights(RES_DIR + 'voc12_weights')
