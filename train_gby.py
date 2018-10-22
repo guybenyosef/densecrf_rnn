@@ -3,231 +3,282 @@ MIT License
 
 """
 
-# import sys
-# sys.path.insert(1, './src')
-# from crfrnn_model import get_crfrnn_model_def
-# from fcn8_model import get_fcn8_model_def
-# from fcn32_model_gby import fcn_32s
-# import util
-# from os import listdir
-# from os.path import isfile, join
-# import numpy as np
-# from scipy import misc
-# from PIL import Image
-# from keras import optimizers
-# from keras import losses
-# import pickle
-# import pdb
-#
-# INPUT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/pascal_voc12/images_orig/"
-# GT_DIR = "/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/data/pascal_voc12/labels_orig/"
-# RES_DIR = "/storage/gby/semseg/"
-#
-# def prepare_training_data(img_list_path, im_file_name, label_file_name):
-#     with open(img_list_path) as f:
-#         content = f.readlines()
-#     im_list = sorted([x[42:-5] for x in content]) # Slicing specific to pascal voc trainval lists
-#
-#     # Prepare image and label data
-#     inputs, labels = [], []
-#     i=0
-#     for name in im_list:
-#         img_data, img_h, img_w = util.get_preprocessed_image(INPUT_DIR + name + ".jpg")
-#         inputs.append(img_data)
-#
-#         if i % 100 == 0:
-#             print("Processed ", i)
-#         img_data, img_h, img_w = util.get_preprocessed_label(GT_DIR + name + ".png", 21)
-#         labels.append(img_data)
-#         i+=1
-#     '''
-#     # Using pickle
-#     im_file = open(im_file_name, 'wb')
-#     pickle.dump(inputs,im_file)
-#     im_file.close()
-#     label_file = open(label_file_name, 'wb')
-#     pickle.dump(labels, label_file)
-#     label_file.close()
-#     '''
-#
-#     # Using numpy
-#     np.save(RES_DIR + "image_data.npy", inputs)
-#     np.save(RES_DIR + "label_data.npy", labels)
-#
-# def train(im_file_name, label_file_name):
-#     # Load img and label data
-#     '''
-#     # Using pickle
-#     input_file = open(im_file_name, 'rb')
-#     inputs = pickle.load(input_file)
-#     label_file = open(label_file_name, 'rb')
-#     labels = pickle.load(label_file)
-#     '''
-#
-#     # Using numpy
-#     inputs = np.load(RES_DIR + "image_data.npy")
-#     labels = np.load(RES_DIR + "label_data.npy")
-#     #pdb.set_trace()
-#     # Download the model from https://goo.gl/ciEYZi
-#     saved_model_path = 'crfrnn_keras_model.h5'
-#
-#     # Initialize model
-#     # fcn8:
-#     # model = get_fcn8_model_def(
-#     # fcn32
-#     model = fcn_32s()
-#     # crfasarnn
-#     #model = get_crfrnn_model_def()
-#     #model.load_weights(saved_model_path)
-#
-#     # Compile model
-#     #adam = optimizers.Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-#     #adam = optimizers.Adam(lr=1e-13, beta_1=0.99, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-#     #adam = optimizers.Adam(lr=1e-9, beta_1=0.99, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False)
-#     #model.compile(loss='mean_squared_error', optimizer=adam)
-#     #model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
-#     #model.compile(loss='categorical_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
-#     #model.compile(loss=losses.sparse_categorical_crossentropy, optimizer=adam)
-#     model.compile(loss='categorical_crossentropy', optimizer='sgd')
-#
-#     #model.fit(x=inputs, y=labels, batch_size=1)
-#     # Start finetuning
-#     #for i in range(len(inputs)):
-#     for i in range(1000):
-#         print("img ", i)
-#     #    model.fit(x=inputs[i], y=labels[i], epochs=3, steps_per_epoch=1)
-#         model.fit(x=inputs[i], y=labels[i], epochs=1, steps_per_epoch=1)
-#
-#
-#     # Save model weights
-#     model.save_weights(RES_DIR + 'voc12_weights')
-#
-# if __name__ == '__main__':
-#     image_fn, label_fn = "image_data.npy", "label_data.npy"
-#   #  prepare_training_data("./list/train.txt", image_fn, label_fn)
-#     #pdb.set_trace()
-#     train(image_fn, label_fn)
 
 import numpy as np
-from keras.callbacks import ModelCheckpoint
-from keras.optimizers import Adam
-from keras.optimizers import SGD
-from keras import backend as K
-import matplotlib.pyplot as plt
-import argparse
+#from keras.callbacks import ModelCheckpoint
+#from keras.optimizers import Adam
+#from keras.optimizers import SGD
+#from keras import backend as K
+#import matplotlib.pyplot as plt
 import pdb
-from models_gby import fcn_32s,fcn_8s,fcn_VGG16_32s_crfrnn
-from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby
+from models_gby import load_model_gby
+#from models_gby import fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
+from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,IoU_ver2,give_color_to_seg_img,visualize_conv_filters
 
-#from fcn8_model import get_fcn8_model_def
-#from crfrnn_model import get_crfrnn_model_def
+## Import usual libraries
+import os
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+import keras, sys, time, warnings
+from keras.models import *
+from keras.layers import *
+import pandas as pd
+from sklearn.utils import shuffle
+from keras import optimizers
+import argparse
+import pickle
+from keras.optimizers import Adam
+from weighted_categorical_crossentropy import weighted_loss
+
+# Median Frequency Alpha Coefficients
+coefficients = {0:0.0237995754847,
+                1:0.144286494916,
+                2:0.038448897913,
+                3:1.33901803472,
+                4:1.0,
+                5:0.715098627127,
+                6:4.20827446939,
+                7:1.58754122255,
+                8:0.0551054437019,
+                9:0.757994265912,
+                10:0.218245600783,
+                11:0.721125616748
+                # 12:6.51048559366,
+                # 13:0.125434198729,
+                # 14:3.27995580458,
+                # 15:3.72813940546,
+                # 16:3.76817843552,
+                # 17:8.90686657342,
+                # 18:2.12162414027,
+                # 19:0.
+                }
+# for python 2.7:
+#coefficients = [key for index,key in coefficients.iteritems()]
+#python 3:
+coefficients = [key for index,key in coefficients.items()]
+
+## location of VGG weights
+VGG_Weights_path = "../FacialKeypoint/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5"
 
 RES_DIR = "/storage/gby/semseg/"
 
-nb_classes = 21
+def argument_parser():
+    parser = argparse.ArgumentParser(description='Process arguments')
+    parser.add_argument('-m', '--model', help='choose between \'fcn_VGG16_32s\',\'fcn_VGG16_8s\',\'fcn_RESNET50_32s\', and \'fcn_RESNET50_8s\' networks, with or without \'_crfrnn\' suffix', type=str)
+    # parser.add_argument('-trp', '--trainpath',  help='Absolute path of the training set', type=str)
+    # parser.add_argument('-vdp', '--validationpath', help='Absolute path of the validation set', type=str)
+    # parser.add_argument('-tsp', '--testpath', help='Absolute path of the test set', type=str)
+    parser.add_argument('-bs', '--batchsize', default=1, help='Specify the number of batches', type=int)
+    parser.add_argument('-w', '--weights', nargs='?', default=None, const=None, help='The absolute path of the weights', type=str)
+    parser.add_argument('-e', '--epochs', default=None, const=None, help='Specify the number of epochs to train', type=int)
+    parser.add_argument('-vb', '--verbosemode', default=1, help='Specify the verbose mode',type=int)
+
+
+
+    return parser.parse_args()
 
 # ===========================
 # Main
 # ===========================
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('train_data')
-    parser.add_argument('val_data')
-    parser.add_argument('image_dir')
-    parser.add_argument('label_dir')
-    args = parser.parse_args()
-    nb_data = sum(1 for line in open(args.train_data))
 
-    INPUT_SIZE = None  # None # 496 # 510, 500
-    model = fcn_8s(INPUT_SIZE,nb_classes)
-    #model = fcn_32s(nb_classes)
+    # Parse args:
+    # -----------
+    args = argument_parser()
 
-    # # crfrnn:
-    # INPUT_SIZE = 480  # None # 496 # 510, 500
-    # model = fcn_VGG16_32s_crfrnn(INPUT_SIZE,nb_classes)
+    # Import Keras and Tensorflow to develop deep learning FCN models:
+    # -----------------------------------------------------------------
+    warnings.filterwarnings("ignore")
+
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    config = tf.ConfigProto()
+    config.gpu_options.per_process_gpu_memory_fraction = 0.70 # default: "0.95"
+    config.gpu_options.visible_device_list = "2" # default: "2"
+    set_session(tf.Session(config=config))
+
+    print("python {}".format(sys.version))
+    print("keras version {}".format(keras.__version__)) #; del keras
+    print("tensorflow version {}".format(tf.__version__))
+
+    # ===============
+    # LOAD train data:
+    # ===============
+    trainset_name = 'streets'
+    INPUT_SIZE = 224  # #500 #224 #512
+    nb_classes = 12
+    dir_img = '/storage/gby/datasets/seg_data_practice/images_prepped_train/'
+    dir_seg = '/storage/gby/datasets/seg_data_practice/annotations_prepped_train/'
+    images = os.listdir(dir_img)
+    images.sort()
+    segmentations = os.listdir(dir_seg)
+    segmentations.sort()
+    #
+    X = []
+    Y = []
+    for im, seg in zip(images, segmentations):
+        X.append(getImageArr(dir_img + im, INPUT_SIZE, INPUT_SIZE))
+        Y.append(getSegmentationArr(dir_seg + seg, INPUT_SIZE, INPUT_SIZE, nb_classes))
+    X, Y = np.array(X), np.array(Y)
+    print(X.shape, Y.shape)
+    # Split between training and testing data:
+    # -----------------------------------------
+    train_rate = 0.85
+    allow_randomness = False
+
+    if allow_randomness:
+        index_train = np.random.choice(X.shape[0], int(X.shape[0] * train_rate), replace=False)
+        index_test = list(set(range(X.shape[0])) - set(index_train))
+        X, Y = shuffle(X, Y)
+        X_train, y_train = X[index_train], Y[index_train]
+        X_test, y_test = X[index_test], Y[index_test]
+    else:
+        index_train = int(X.shape[0] * train_rate) #  NOTE
+        X_train, y_train = X[0:index_train], Y[0:index_train]
+        X_test, y_test = X[index_train:-1], Y[index_train:-1]  # NOTE -1
+
+    print(X_train.shape, y_train.shape)
+    print(X_test.shape, y_test.shape)
+
+
+    # (for our voc2012 data:)
+    # nb_classes = 21
+    # print('training data:')
+    # [train_imgs,train_labels] = extract_arrays_from_file(args.train_data, args.image_dir, args.label_dir, INPUT_SIZE, nb_classes)
+    # #print('validation data:')
+    # [val_imgs,val_labels] = extract_arrays_from_file(args.val_data, args.image_dir, args.label_dir, INPUT_SIZE, nb_classes)
+    #
+    # X_train, y_train = np.array(train_imgs)[:,0,:,:,:], np.array(train_labels)[:,0,:,:,:]
+    # X_test, y_test = np.array(val_imgs)[:, 0, :, :, :], np.array(val_labels)[:, 0, :, :, :]
+    # #print(X.shape, Y.shape)
+
+    # ===============
+    # LOAD model:
+    # ===============
+
+    # for training:
+    num_crf_iterations = 5
+
+    model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations)
 
     # if resuming training:
-    #saved_model_path = '/storage/gby/semseg/voc12_weights_180_snap' # voc12_weights_36_snap' #'crfrnn_keras_model.h5'
-    #model.load_weights(saved_model_path)
+    #pdb.set_trace()
+
+    if (args.weights is not None) and (os.path.exists(args.weights)):
+        model.load_weights(args.weights)
 
     model.summary()
+    print('trining model %s..'% model.name)
 
-    # compile 1:
-    # model.compile(loss="binary_crossentropy", optimizer='sgd',metrics=['accuracy'])
-    #model.compile(loss="categorical_crossentropy", optimizer='sgd', metrics=['accuracy'])
-    # compile 2:
-    model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0001), metrics=['accuracy'])
-    # compile 3:
-    # sgd = SGD(lr=1E-2, decay=5**(-4), momentum=0.9, nesterov=True)
-    # model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    # ===============
+    # TRAIN model:
+    # ===============
+    #sgd = optimizers.SGD(lr=1E-2, decay=5 ** (-4), momentum=0.9, nesterov=True)
+    #sgd = optimizers.SGD(lr=1e-13, momentum=0.99)
+    #adm = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001)
+    #model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    #model.compile(loss="categorical_crossentropy", optimizer=adm, metrics=['accuracy'])
+    #model.compile(loss="binary_crossentropy", optimizer='sgd', metrics=['accuracy'])
+    #model.compile(loss='categorical_crossentropy', optimizer=optimizers.Adam(lr=0.0001), metrics=['accuracy'])
+    #model.compile(loss="categorical_crossentropy", optimizer='Adadelta', metrics=['accuracy'])
 
+    num_epochs = args.epochs
+    batch_size = args.batchsize
+    verbose_mode = args.verbosemode
 
-    # ------------------------------
-    # Begin training procedure:
-    # ------------------------------
-    print('lr = {}'.format(K.get_value(model.optimizer.lr)))
+    if model.crf_flag:
+        model.compile(loss=weighted_loss(nb_classes, coefficients),
+                      optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001),
+                      metrics=['accuracy'])
+    else:
+        model.compile(loss='categorical_crossentropy',
+                      optimizer='sgd',
+                      metrics=['accuracy'])
 
-    # -- if we use 'fit': --
-    # print('training data:')
-    # [train_imgs,train_labels] = extract_arrays_from_file(args.train_data, args.image_dir, args.label_dir)
-    print('validation data:')
-    [val_imgs,val_labels] = extract_arrays_from_file(args.val_data, args.image_dir, args.label_dir, INPUT_SIZE, nb_classes)
-    #pdb.set_trace()
-    # or simply,
-    # train_imgs = np.load(RES_DIR + "image_data.npy")[:,0,:,:]
-    # train_labels = np.load(RES_DIR + "label_data.npy")[:,0,:,:]
+    hist1 = model.fit(X_train, y_train,
+                      validation_data=(X_test, y_test),
+                      batch_size=batch_size, epochs=num_epochs, verbose=verbose_mode)
+    # ===============
+    # SAVE model:
+    # ===============
+    model.save_weights(RES_DIR + trainset_name + '_weights_' + model.name + '_' + str(num_epochs) + 'ep')
 
-    for epoch in range(50):
+    # ===============
+    # ANALYZE model:
+    # ===============
+    save_graphics_mode = False
+    print_IoU_flag = False
+    visualize_filters_flag = False
 
-        print('Starting epoch %d ..' % epoch)
+    # Visualize conv filters:
+    # -------------------------------------
+    layer_name = 'score2' # 'crfrnn' 'score2'
+    if visualize_filters_flag:
+        visualize_conv_filters(model, INPUT_SIZE, layer_name)
 
-        hist1 = model.fit_generator(
-            generate_arrays_from_file(args.train_data, args.image_dir, args.label_dir, INPUT_SIZE, nb_classes),
-            validation_data=generate_arrays_from_file(args.val_data, args.image_dir, args.label_dir, INPUT_SIZE, nb_classes),
-            steps_per_epoch=nb_data,
-            validation_steps=nb_data,
-            epochs=1,
-            verbose=1)    # verbose=1 to show progress bar # verbose=2 to show one line per epoch
+    # Plot/save the change in loss over epochs:
+    # -------------------------------------
+    with open('trainHistoryDict', 'wb') as file_pi:
+        pickle.dump(hist1.history, file_pi)
 
-        # hist1 = model.fit(
-        #     x=train_imgs,
-        #     y=train_labels,
-        #     #validation_data=[val_imgs,val_labels],
-        #     batch_size=1,
-        #     epochs=1,
-        #     verbose=2)
+    if(save_graphics_mode):
+        for key in ['loss', 'val_loss']:
+            plt.plot(hist1.history[key], label=key)
+        plt.legend()
+        #plt.show(block=False)
+        plt.savefig('loss_plot.pdf')
 
-        # show loss plot:
-        # for key in ['loss', 'val_loss']:
-        #     plt.plot(hist1.history[key], label=key)
-        # plt.legend()
-        # plt.show()
-
-        # Compute IOU:
+    # Compute IOU:
+    # ------------
+    if(print_IoU_flag):
         print('computing mean IoU for validation set..')
-        mIoU = 0
-        for k in range(len(val_imgs)):
-            X_test = val_imgs[k]
-            y_test = val_labels[k]
-            # pdb.set_trace()
-            y_pred = model.predict(X_test)
-            y_predi = np.argmax(y_pred, axis=3)
-            y_testi = np.argmax(y_test, axis=3)
-            # print(y_testi.shape, y_predi.shape)
-            mIoU += IoU(y_testi, y_predi,nb_classes)
-        mIoU = mIoU/len(val_imgs)
+        y_pred = model.predict(X_test)
+        y_predi = np.argmax(y_pred, axis=3)
+        y_testi = np.argmax(y_test, axis=3)
+        print(y_testi.shape, y_predi.shape)
+        IoU_ver2(y_testi, y_predi)
+        #pdb.set_trace()
 
-        print("Mean IoU: {:4.3f}".format(mIoU))
-        print("_________________")
+    # Visualize the model performance:
+    # --------------------------------
+    shape = (INPUT_SIZE, INPUT_SIZE)
+    n_classes = nb_classes # 10
 
-        # Predict 1 test exmplae and save:
-        model_predict_gby(model, 'image.jpg', 'predict-{}.png'.format(epoch), INPUT_SIZE)
-        #model.save_weights(RES_DIR + 'voc12_weights-{}'.format(epoch))
+    if save_graphics_mode:
 
-    #model.save_weights(RES_DIR + 'voc12_weights')
+        num_examples_to_plot = 4
+
+        fig = plt.figure(figsize=(10, 3*num_examples_to_plot))
+
+        for i in range(num_examples_to_plot):
+
+            img_indx = i*4
+            img_is = (X_test[img_indx] + 1) * (255.0 / 2)
+            seg = y_predi[img_indx]
+            segtest = y_testi[img_indx]
+
+            ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 1)
+            ax.imshow(img_is / 255.0)
+            if i == 0:
+                ax.set_title("original")
+
+            ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 2)
+            ax.imshow(give_color_to_seg_img(seg, n_classes))
+            if i == 0:
+                ax.set_title("predicted class")
+
+            ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 3)
+            ax.imshow(give_color_to_seg_img(segtest, n_classes))
+            if i == 0:
+                ax.set_title("true class")
+
+        plt.savefig('examples.png')
 
 
 # usage:
-# >>python train_gby.py ./list/train2s.txt ./list/val2s.txt /storage/gby/datasets/pascal_voc12/images_orig/ /storage/gby/datasets/pascal_voc12/labels_orig/
-# >>python train_gby.py ./list/train2.txt ./list/val2.txt /storage/gby/datasets/pascal_voc12/images_orig/ /storage/gby/datasets/pascal_voc12/labels_orig/
+# >>python train2.py ./list/train2s.txt ./list/val2s.txt /storage/gby/datasets/pascal_voc12/images_orig/ /storage/gby/datasets/pascal_voc12/labels_orig/
+# >>python train2.py ./list/train2.txt ./list/val2.txt /storage/gby/datasets/pascal_voc12/images_orig/ /storage/gby/datasets/pascal_voc12/labels_orig/
 # comment: /storage/gby/datasets/pascal_voc12/ is a copy of Cristina's folder
+
+
+
+#

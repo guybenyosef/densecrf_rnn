@@ -7,8 +7,8 @@ import numpy as np
 #from keras import backend as K
 import matplotlib.pyplot as plt
 import pdb
-from models_gby import fcn_32s_orig,fcn_32s,fcn_VGG16_32s_crfrnn,fcn_8s_take2,fcn_VGG16_8s_crfrnn,fcn_RESNET50_32s,fcn_RESNET50_8s,fcn_8s_Sadeep
-from crfrnn_model import get_crfrnn_model_def
+from models_gby import load_model_gby
+#fcn_VGG16_32s,fcn_VGG16_32s_crfrnn,fcn_VGG16_8s,fcn_VGG16_8s_crfrnn,fcn_RESNET50_32s,fcn_RESNET50_32s_crfrnn,fcn_RESNET50_8s,fcn_RESNET50_8s_crfrnn
 from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,IoU_ver2,give_color_to_seg_img
 
 ## Import usual libraries
@@ -22,16 +22,26 @@ import pandas as pd
 from sklearn.utils import shuffle
 from keras import optimizers
 import argparse
-
-
-RES_DIR = "/storage/gby/semseg/"
-
-INPUT_SIZE = 500 #500 #224
+import ntpath
 
 # ===========================
 # Main
 # ===========================
 if __name__ == '__main__':
+
+    # Import Keras and Tensorflow to develop deep learning FCN models:
+    # -----------------------------------------------------------------
+    warnings.filterwarnings("ignore")
+
+    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+    config = tf.ConfigProto()
+    config.gpu_options.per_process_gpu_memory_fraction = 0.70 #0.95
+    config.gpu_options.visible_device_list = "2"
+    set_session(tf.Session(config=config))
+
+    print("python {}".format(sys.version))
+    print("keras version {}".format(keras.__version__)) #; del keras
+    print("tensorflow version {}".format(tf.__version__))
 
     # Parse args:
     # -----------
@@ -40,22 +50,11 @@ if __name__ == '__main__':
     # parser.add_argument('test_data')
     # args = parser.parse_args()
 
-    # Import Keras and Tensorflow to develop deep learning FCN models:
-    # -----------------------------------------------------------------
-    warnings.filterwarnings("ignore")
-
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    config = tf.ConfigProto()
-    config.gpu_options.per_process_gpu_memory_fraction = 0.95
-    config.gpu_options.visible_device_list = "2"
-    set_session(tf.Session(config=config))
-
-    print("python {}".format(sys.version))
-    print("keras version {}".format(keras.__version__)) #; del keras
-    print("tensorflow version {}".format(tf.__version__))
-
     # Data processing: (for their dataset)
     # -----------------------------------------
+    dnns_dir = '/storage/gby/semseg/'
+    INPUT_SIZE = 224  # 500 #224
+    num_crf_iterations = 10  # at test time
     nb_classes = 12
     dir_img = '/storage/gby/datasets/seg_data_practice/images_prepped_train/'
     dir_seg = '/storage/gby/datasets/seg_data_practice/annotations_prepped_train/'
@@ -105,43 +104,61 @@ if __name__ == '__main__':
     # Constructing model:
     # --------------------
     #names = {'fcn32s_orig','fcn32s','fcn8s'}
-    names = {'fcn8s'}
+    model_names = [
+#        'fcn_RESNET50_8s',
+#        'fcn_RESNET50_8s',
+        'fcn_RESNET50_8s_crfrnn',
+        'fcn_RESNET50_8s_crfrnn'
+        ]
+    # 'fcn_VGG16_8s',
+                   # 'fcn_RESNET50_8s',
+                   # 'fcn_VGG16_8s',
+                   # 'fcn_RESNET50_32s',
+                   # 'fcn_VGG16_32s',
+                   # 'fcn_VGG16_32s']
+
+    #names = {'fcn8s_Sadeep_crfrnn'}
     #names = {'fcn32s','resnet50fcn32s','fcn8s'}
     #names = {'resnet50fcn32s'}
+    model_path_names = [
+ #       dnns_dir + 'streets_weights_resnet50fcn8s_1000ep',
+ #       dnns_dir + 'streets_weights_resnet50fcn8s_2000ep',
+        dnns_dir + 'streets_weights_fcn_RESNET50_8s_crfrnn_2000+1ep',
+        dnns_dir + 'streets_weights_fcn_RESNET50_8s_crfrnn_2000+200ep'
+        ]
 
-    model_names = list(names)
+    # dnns_dir+'streets_weights_vgg16fcn8s_100ep',
+                        # dnns_dir+'streets_weights_resnet50fcn8s_50ep',
+                        # dnns_dir+'streets_weights_vgg16fcn8s_5000ep',
+                        # dnns_dir+'streets_weights_resnet50fcn32s_400ep',
+                        # dnns_dir+'streets_weights_vgg16fcn32s_100ep',
+                        # dnns_dir+'streets_weights_vgg16fcn32s_5000ep']
 
-    for model_name in model_names:
-        model_path_name = '/storage/gby/semseg/streets_weights_'+model_name+'_Sadeep_10ep'
+    #model_path_names = {'/storage/gby/semseg/streets_weights_fcn8s_Sadeep_RNN_50ep'}
+
+    for indx in range(len(model_names)):
+        #model_path_name = '/storage/gby/semseg/streets_weights_'+model_name+'_10ep'
       #  model_path_name = '/storage/gby/semseg/streets_weights_' + model_name + '_100ep'
+        model_name = model_names[indx]
+        model_path_name = model_path_names[indx]
 
-        if model_name == 'fcn32s_orig':
-            model = fcn_32s_orig(nb_classes)
+        print('====================================================================================')
+        print(model_path_name)
+        print('====================================================================================')
+        #loading model:
+        model = load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations)
 
-        elif model_name == 'fcn32s':
-            model = fcn_32s(INPUT_SIZE, nb_classes)
-
-        elif model_name == 'fcn8s':
-            #model = fcn_8s_take2(INPUT_SIZE, nb_classes)
-            model = fcn_8s_Sadeep(nb_classes)
-
-        elif model_name == 'resnet50fcn32s':
-            model = fcn_RESNET50_32s(INPUT_SIZE, nb_classes)
-
-        else:
-            print('ERROR: model name does not exist..')
-
-
-        # loading model:
+        #loading weights:
         model.load_weights(model_path_name)
+
+        batchsize = 6
+        if model.crf_flag:
+            batchsize = 1
 
         # Compute IOU:
         # ------------
-        print('==========================================')
-        print(model_path_name)
-        print('==========================================')
         print('computing mean IoU for validation set..')
-        y_pred = model.predict(X)
+        y_pred = model.predict(X,batch_size=batchsize, verbose=1)
         y_predi = np.argmax(y_pred, axis=3)
         y_testi = np.argmax(Y, axis=3)
         print(y_testi.shape, y_predi.shape)
@@ -178,9 +195,10 @@ if __name__ == '__main__':
             if i == 0:
                 ax.set_title("true class")
 
-        plt.savefig('examples_%s.png' % model_name)
+        plt.savefig('examples_%s.png' % ntpath.basename(model_path_name))
 
-
+        keras.backend.clear_session()
+        # clear model: Destroys the current TF graph and creates a new one. Useful to avoid clutter from old models / layers.
 
 
 

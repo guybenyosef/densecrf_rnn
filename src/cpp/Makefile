@@ -21,7 +21,7 @@ TF_LIB := $(shell python -c 'import tensorflow as tf; print(tf.sysconfig.get_lib
 TF_VERSION_GTE_1_4 := $(shell expr `python -c 'import tensorflow as tf; print(tf.__version__)' | cut -f1,2 -d.` \>= 1.4)
 
 # Flags required for all cases
-CFLAGS := -std=c++11 -D_GLIBCXX_USE_CXX11_ABI=0 -shared -fPIC -I$(TF_INC) -O2 
+CFLAGS := -std=c++11 -D_GLIBCXX_USE_CXX11_ABI=1 -shared -fPIC -I$(TF_INC) -O2 
 
 # Set a special flag if we are on macOS
 ifeq ($(shell uname -s), Darwin)
