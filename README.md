@@ -2,7 +2,7 @@
 ![sample](sample.png)
 
 
-[comment]: <> This repository contains Keras/Tensorflow code for the "CRF-RNN" semantic image segmentation method, implemented in TensorFlow Keras by https://github.com/sadeepj/crfasrnn_keras
+This repository contains Keras/Tensorflow code for the "CRF-RNN" semantic image segmentation method, implemented in TensorFlow Keras by https://github.com/sadeepj/crfasrnn_keras
 
 
 Train:
