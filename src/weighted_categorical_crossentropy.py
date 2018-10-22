@@ -1,3 +1,6 @@
+# taken from :
+# https://github.com/dimimal/semantics_segmentation_of_urban_environments.git
+
 from keras import backend as K
 import tensorflow as tf
 

@@ -20,6 +20,13 @@ sns.set_style("whitegrid", {'axes.grid' : False})
 # ------------------
 # Extract files:
 # ------------------
+def dir2list(names,listname):
+    #names = os.listdir(dirname)
+    f = open(listname, 'w')
+    for name in names:
+        f.write(name.split(".")[0] + '\n')
+    f.close()
+
 def getImageArr(path, width, height):
     img_org = Image.open(path)
     img = np.float32(np.array(img_org.resize((width, height)))) / 127.5 - 1
@@ -76,6 +83,8 @@ def load_label(path,INPUT_SIZE,nb_classes):
     img = np.array(img, dtype=np.uint8)
     img[img==255] = 0
     y = np.zeros((1, img.shape[0], img.shape[1], nb_classes), dtype=np.float32)
+    # print(path)
+    # print(np.unique(img))
     for i in range(img.shape[0]):
         for j in range(img.shape[1]):
             y[0, i, j, img[i][j]] = 1

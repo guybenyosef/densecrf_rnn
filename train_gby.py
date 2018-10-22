@@ -4,7 +4,6 @@ MIT License
 """
 
 
-import numpy as np
 #from keras.callbacks import ModelCheckpoint
 #from keras.optimizers import Adam
 #from keras.optimizers import SGD
@@ -12,8 +11,9 @@ import numpy as np
 #import matplotlib.pyplot as plt
 import pdb
 from models_gby import load_model_gby
+from datatsets_gby import load_dataset
 #from models_gby import fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
-from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,IoU_ver2,give_color_to_seg_img,visualize_conv_filters
+from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters
 
 ## Import usual libraries
 import os
@@ -23,12 +23,11 @@ import keras, sys, time, warnings
 from keras.models import *
 from keras.layers import *
 import pandas as pd
-from sklearn.utils import shuffle
 from keras import optimizers
 import argparse
 import pickle
 from keras.optimizers import Adam
-from weighted_categorical_crossentropy import weighted_loss
+from src.weighted_categorical_crossentropy import weighted_loss
 
 # Median Frequency Alpha Coefficients
 coefficients = {0:0.0237995754847,
@@ -64,16 +63,13 @@ RES_DIR = "/storage/gby/semseg/"
 
 def argument_parser():
     parser = argparse.ArgumentParser(description='Process arguments')
-    parser.add_argument('-m', '--model', help='choose between \'fcn_VGG16_32s\',\'fcn_VGG16_8s\',\'fcn_RESNET50_32s\', and \'fcn_RESNET50_8s\' networks, with or without \'_crfrnn\' suffix', type=str)
-    # parser.add_argument('-trp', '--trainpath',  help='Absolute path of the training set', type=str)
-    # parser.add_argument('-vdp', '--validationpath', help='Absolute path of the validation set', type=str)
-    # parser.add_argument('-tsp', '--testpath', help='Absolute path of the test set', type=str)
+    parser.add_argument('-m', '--model', default='fcn_RESNET50_8s', help='choose between \'fcn_VGG16_32s\',\'fcn_VGG16_8s\',\'fcn_RESNET50_32s\', and \'fcn_RESNET50_8s\' networks, with or without \'_crfrnn\' suffix', type=str)
+    parser.add_argument('-ds', '--dataset', default='streets', help='The name of train/test sets', type=str)
     parser.add_argument('-bs', '--batchsize', default=1, help='Specify the number of batches', type=int)
-    parser.add_argument('-w', '--weights', nargs='?', default=None, const=None, help='The absolute path of the weights', type=str)
-    parser.add_argument('-e', '--epochs', default=None, const=None, help='Specify the number of epochs to train', type=int)
+    parser.add_argument('-is', '--inputsize', default=None, help='Specify the input size N, where N=rows,N=cols. ', type=int)
+    parser.add_argument('-w', '--weights', default=None, nargs='?', const=None, help='The absolute path of the weights', type=str)
+    parser.add_argument('-e', '--epochs', default=1, const=None, help='Specify the number of epochs to train', type=int)
     parser.add_argument('-vb', '--verbosemode', default=1, help='Specify the verbose mode',type=int)
-
-
 
     return parser.parse_args()
 
@@ -81,6 +77,10 @@ def argument_parser():
 # Main
 # ===========================
 if __name__ == '__main__':
+
+    # ===============
+    # INTRO
+    # ===============
 
     # Parse args:
     # -----------
@@ -103,53 +103,13 @@ if __name__ == '__main__':
     # ===============
     # LOAD train data:
     # ===============
-    trainset_name = 'streets'
-    INPUT_SIZE = 224  # #500 #224 #512
-    nb_classes = 12
-    dir_img = '/storage/gby/datasets/seg_data_practice/images_prepped_train/'
-    dir_seg = '/storage/gby/datasets/seg_data_practice/annotations_prepped_train/'
-    images = os.listdir(dir_img)
-    images.sort()
-    segmentations = os.listdir(dir_seg)
-    segmentations.sort()
-    #
-    X = []
-    Y = []
-    for im, seg in zip(images, segmentations):
-        X.append(getImageArr(dir_img + im, INPUT_SIZE, INPUT_SIZE))
-        Y.append(getSegmentationArr(dir_seg + seg, INPUT_SIZE, INPUT_SIZE, nb_classes))
-    X, Y = np.array(X), np.array(Y)
-    print(X.shape, Y.shape)
-    # Split between training and testing data:
-    # -----------------------------------------
-    train_rate = 0.85
-    allow_randomness = False
 
-    if allow_randomness:
-        index_train = np.random.choice(X.shape[0], int(X.shape[0] * train_rate), replace=False)
-        index_test = list(set(range(X.shape[0])) - set(index_train))
-        X, Y = shuffle(X, Y)
-        X_train, y_train = X[index_train], Y[index_train]
-        X_test, y_test = X[index_test], Y[index_test]
-    else:
-        index_train = int(X.shape[0] * train_rate) #  NOTE
-        X_train, y_train = X[0:index_train], Y[0:index_train]
-        X_test, y_test = X[index_train:-1], Y[index_train:-1]  # NOTE -1
+    INPUT_SIZE = args.inputsize  #500 #224 #512
 
-    print(X_train.shape, y_train.shape)
-    print(X_test.shape, y_test.shape)
-
-
-    # (for our voc2012 data:)
-    # nb_classes = 21
-    # print('training data:')
-    # [train_imgs,train_labels] = extract_arrays_from_file(args.train_data, args.image_dir, args.label_dir, INPUT_SIZE, nb_classes)
-    # #print('validation data:')
-    # [val_imgs,val_labels] = extract_arrays_from_file(args.val_data, args.image_dir, args.label_dir, INPUT_SIZE, nb_classes)
-    #
-    # X_train, y_train = np.array(train_imgs)[:,0,:,:,:], np.array(train_labels)[:,0,:,:,:]
-    # X_test, y_test = np.array(val_imgs)[:, 0, :, :, :], np.array(val_labels)[:, 0, :, :, :]
-    # #print(X.shape, Y.shape)
+    ds = load_dataset(args.dataset,INPUT_SIZE)
+    print(ds.X_train.shape, ds.y_train.shape)
+    print(ds.X_test.shape, ds.y_test.shape)
+    nb_classes = ds.nb_classes
 
     # ===============
     # LOAD model:
@@ -161,8 +121,6 @@ if __name__ == '__main__':
     model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations)
 
     # if resuming training:
-    #pdb.set_trace()
-
     if (args.weights is not None) and (os.path.exists(args.weights)):
         model.load_weights(args.weights)
 
@@ -194,13 +152,14 @@ if __name__ == '__main__':
                       optimizer='sgd',
                       metrics=['accuracy'])
 
-    hist1 = model.fit(X_train, y_train,
-                      validation_data=(X_test, y_test),
+    hist1 = model.fit(ds.X_train, ds.y_train,
+                      validation_data=(ds.X_test, ds.y_test),
                       batch_size=batch_size, epochs=num_epochs, verbose=verbose_mode)
+
     # ===============
     # SAVE model:
     # ===============
-    model.save_weights(RES_DIR + trainset_name + '_weights_' + model.name + '_' + str(num_epochs) + 'ep')
+    model.save_weights(RES_DIR + args.dataset + '_weights_' + model.name + '_' + str(num_epochs) + 'ep')
 
     # ===============
     # ANALYZE model:
@@ -231,9 +190,9 @@ if __name__ == '__main__':
     # ------------
     if(print_IoU_flag):
         print('computing mean IoU for validation set..')
-        y_pred = model.predict(X_test)
+        y_pred = model.predict(ds.X_test)
         y_predi = np.argmax(y_pred, axis=3)
-        y_testi = np.argmax(y_test, axis=3)
+        y_testi = np.argmax(ds.y_test, axis=3)
         print(y_testi.shape, y_predi.shape)
         IoU_ver2(y_testi, y_predi)
         #pdb.set_trace()
@@ -252,7 +211,7 @@ if __name__ == '__main__':
         for i in range(num_examples_to_plot):
 
             img_indx = i*4
-            img_is = (X_test[img_indx] + 1) * (255.0 / 2)
+            img_is = (ds.X_test[img_indx] + 1) * (255.0 / 2)
             seg = y_predi[img_indx]
             segtest = y_testi[img_indx]
 
