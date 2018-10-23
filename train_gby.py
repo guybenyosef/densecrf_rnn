@@ -11,7 +11,7 @@ MIT License
 #import matplotlib.pyplot as plt
 import pdb
 from models_gby import load_model_gby
-from datatsets_gby import load_dataset
+from datasets_gby import load_dataset
 #from models_gby import fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
 from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters
 

@@ -11,7 +11,7 @@ import ntpath
 #
 import numpy as np
 from models_gby import load_model_gby
-from datatsets_gby import load_dataset
+from datasets_gby import load_dataset
 import matplotlib.pyplot as plt
 from utils_gby import IoU_ver2,give_color_to_seg_img
 import pdb
