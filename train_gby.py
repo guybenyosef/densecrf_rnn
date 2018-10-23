@@ -29,33 +29,6 @@ import pickle
 from keras.optimizers import Adam
 from src.weighted_categorical_crossentropy import weighted_loss
 
-# Median Frequency Alpha Coefficients
-coefficients = {0:0.0237995754847,
-                1:0.144286494916,
-                2:0.038448897913,
-                3:1.33901803472,
-                4:1.0,
-                5:0.715098627127,
-                6:4.20827446939,
-                7:1.58754122255,
-                8:0.0551054437019,
-                9:0.757994265912,
-                10:0.218245600783,
-                11:0.721125616748
-                # 12:6.51048559366,
-                # 13:0.125434198729,
-                # 14:3.27995580458,
-                # 15:3.72813940546,
-                # 16:3.76817843552,
-                # 17:8.90686657342,
-                # 18:2.12162414027,
-                # 19:0.
-                }
-# for python 2.7:
-#coefficients = [key for index,key in coefficients.iteritems()]
-#python 3:
-coefficients = [key for index,key in coefficients.items()]
-
 ## location of VGG weights
 VGG_Weights_path = "../FacialKeypoint/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5"
 
@@ -142,6 +115,7 @@ if __name__ == '__main__':
     num_epochs = args.epochs
     batch_size = args.batchsize
     verbose_mode = args.verbosemode
+    coefficients = ds.weighted_loss_coefficients
 
     if model.crf_flag:
         model.compile(loss=weighted_loss(nb_classes, coefficients),
@@ -165,7 +139,7 @@ if __name__ == '__main__':
     # ANALYZE model:
     # ===============
     save_graphics_mode = False
-    print_IoU_flag = False
+    print_IoU_flag = True
     visualize_filters_flag = False
 
     # Visualize conv filters:

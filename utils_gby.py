@@ -2,9 +2,9 @@
 
 import pdb
 from keras import backend as K
-from keras.applications.vgg16 import preprocess_input, decode_predictions
+#from keras.applications.vgg16 import preprocess_input, decode_predictions
 # [DEP] from scipy.misc import imsave
-#from keras.applications.resnet50 import preprocess_input, decode_predictions
+from keras.applications.resnet50 import preprocess_input, decode_predictions
 from PIL import Image
 import numpy as np
 import copy
@@ -83,8 +83,8 @@ def load_label(path,INPUT_SIZE,nb_classes):
     img = np.array(img, dtype=np.uint8)
     img[img==255] = 0
     y = np.zeros((1, img.shape[0], img.shape[1], nb_classes), dtype=np.float32)
-    # print(path)
-    # print(np.unique(img))
+    #print(path)
+    #print(np.unique(img))
     for i in range(img.shape[0]):
         for j in range(img.shape[1]):
             y[0, i, j, img[i][j]] = 1
