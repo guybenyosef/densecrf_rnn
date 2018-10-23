@@ -129,29 +129,6 @@ def voc2012(INPUT_SIZE):
     ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
 
     # Median Frequency Alpha Coefficients
-    # coefficients = {0: 0.0237995754847,
-    #                 1: 0.144286494916,
-    #                 2: 0.038448897913,
-    #                 3: 1.33901803472,
-    #                 4: 1.0,
-    #                 5: 0.715098627127,
-    #                 6: 4.20827446939,
-    #                 7: 1.58754122255,
-    #                 8: 0.0551054437019,
-    #                 9: 0.757994265912,
-    #                 10: 0.218245600783,
-    #                 11: 0.721125616748,
-    #                 12: 0.237995754847,
-    #                 13: 0.144286494916,
-    #                 14: 0.038448897913,
-    #                 15: 1.33901803472,
-    #                 16: 1.0,
-    #                 17: 0.715098627127,
-    #                 18: 4.20827446939,
-    #                 19: 1.58754122255,
-    #                 20: 0.0551054437019,
-    #                 }
-
     coefficients = {
              0: 3.772978369033286,
              1: 1.89431801672104,
@@ -188,6 +165,7 @@ def voc2012(INPUT_SIZE):
 def horsecoarse(INPUT_SIZE):
 
     nb_classes = 5+1
+    #horse: head, tail, torso, upper legs, lower legs
 
     train_data = 'lst/horsecoarse_train.txt'
     val_data = 'lst/horsecoarse_test.txt'
@@ -195,7 +173,14 @@ def horsecoarse(INPUT_SIZE):
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
     label_dir = "/storage/gby/datasets/horse_coarse_parts/labels_orig/"
 
-    return split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+
+    # Median Frequency Alpha Coefficients
+    coefficients = {}
+
+    ds.weighted_loss_coefficients = coefficients
+
+    return ds
 
 def horsefine(INPUT_SIZE):
 
@@ -207,7 +192,14 @@ def horsefine(INPUT_SIZE):
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
     label_dir = '/storage/gby/datasets/horse_fine_parts/labels_orig/'
 
-    return split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+
+    # Median Frequency Alpha Coefficients
+    coefficients = {}
+
+    ds.weighted_loss_coefficients = coefficients
+
+    return ds
 
 # ===================
 # load:
