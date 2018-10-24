@@ -19,14 +19,15 @@ from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters,comp
 import os
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
-import keras, sys, time, warnings
-from keras.models import *
+from keras.callbacks import CSVLogger
+from keras.optimizers import Adam
 from keras.layers import *
+import keras, sys, time, warnings
 import pandas as pd
 from keras import optimizers
 import argparse
 import pickle
-from keras.optimizers import Adam
+
 from src.weighted_categorical_crossentropy import weighted_loss
 
 ## location of VGG weights
@@ -115,9 +116,13 @@ if __name__ == '__main__':
     num_epochs = args.epochs
     batch_size = args.batchsize
     verbose_mode = args.verbosemode
+    #   coefficients = ds.weighted_loss_coefficients
     # for weighted_loss_coefficients
     y_traini = np.argmax(ds.y_train, axis=3)
-    coefficients = compute_median_frequency_reweighting(y_traini)
+    coefficients = list(compute_median_frequency_reweighting(y_traini))
+
+    # Logger callback for learning curves
+    csv_logger = CSVLogger('run/train_log.csv', append=True, separator=',')
 
     if model.crf_flag:
         model.compile(loss=weighted_loss(nb_classes, coefficients),
@@ -126,7 +131,8 @@ if __name__ == '__main__':
     else:
         model.compile(loss='categorical_crossentropy',
                       optimizer='sgd',
-                      metrics=['accuracy'])
+                      metrics=['accuracy'],
+                      callbacks=['csv_logger'])
 
     hist1 = model.fit(ds.X_train, ds.y_train,
                       validation_data=(ds.X_test, ds.y_test),

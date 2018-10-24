@@ -157,7 +157,7 @@ def compute_median_frequency_reweighting(Yi):
     median_count_labels = np.median(count_labels)  # equivalent to median freq
     #print(median_count_labels)
 
-    median_frequency_coef = count_labels/median_count_labels
+    median_frequency_coef = median_count_labels/count_labels
 
     print("median_frequency_reweighting:")
     print(median_frequency_coef)
