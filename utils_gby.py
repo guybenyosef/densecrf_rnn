@@ -145,6 +145,26 @@ def bilinear_upsample_weights(factor, number_of_classes):
     return weights
 
 # -----------------------
+# For loss functions:
+# -----------------------
+def compute_median_frequency_reweighting(Yi):
+    Nclass = int(np.max(Yi)) + 1
+    count_labels = np.zeros(Nclass) #[0] * len(Nclass)
+    for c in range(Nclass):
+        count_labels[c] = np.sum(Yi == c)
+        #print("class {:02.0f}: #pixels={:6.0f}".format(c,count_labels[c]))
+    pdb.set_trace()
+    median_count_labels = np.median(count_labels)  # equivalent to median freq
+    print(median_count_labels)
+
+    median_frequency_coef = count_labels/median_count_labels
+
+    print("median_frequency_reweighting:")
+    print(median_frequency_coef)
+
+    return median_frequency_coef
+
+# -----------------------
 # Predict
 # -----------------------
 def model_predict(model, input_path, output_path):

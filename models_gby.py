@@ -63,7 +63,6 @@ def fcn_VGG16_32s(INPUT_SIZE,nb_classes):
     return model
 
 
-
 def fcn_VGG16_32s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
     """ Returns Keras FCN-32 + CRFRNN layer model definition.
 

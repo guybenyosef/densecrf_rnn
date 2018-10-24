@@ -13,7 +13,7 @@ import pdb
 from models_gby import load_model_gby
 from datasets_gby import load_dataset
 #from models_gby import fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
-from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters
+from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters,compute_median_frequency_reweighting
 
 ## Import usual libraries
 import os
@@ -115,7 +115,9 @@ if __name__ == '__main__':
     num_epochs = args.epochs
     batch_size = args.batchsize
     verbose_mode = args.verbosemode
-    coefficients = ds.weighted_loss_coefficients
+    # for weighted_loss_coefficients
+    y_traini = np.argmax(ds.y_train, axis=3)
+    coefficients = compute_median_frequency_reweighting(y_traini)
 
     if model.crf_flag:
         model.compile(loss=weighted_loss(nb_classes, coefficients),
