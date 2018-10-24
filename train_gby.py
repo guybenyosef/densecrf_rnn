@@ -127,7 +127,7 @@ if __name__ == '__main__':
     if model.crf_flag:
         model.compile(loss=weighted_loss(nb_classes, coefficients),
                       optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001),
-                      metrics=['accuracy'])
+                      metrics=['accuracy']  )
     else:
         model.compile(loss='categorical_crossentropy',
                       optimizer='sgd',
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     # ------------
     if(print_IoU_flag):
         print('computing mean IoU for validation set..')
-        y_pred = model.predict(ds.X_test)
+        y_pred = model.predict(ds.X_test, batch_size=batch_size, verbose=verbose_mode)
         y_predi = np.argmax(y_pred, axis=3)
         y_testi = np.argmax(ds.y_test, axis=3)
         print(y_testi.shape, y_predi.shape)
