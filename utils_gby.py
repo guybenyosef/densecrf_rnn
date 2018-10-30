@@ -2,17 +2,21 @@
 
 import pdb
 from keras import backend as K
+
+# NOTE:   VGG16 or RESNET50
 #from keras.applications.vgg16 import preprocess_input, decode_predictions
-# [DEP] from scipy.misc import imsave
 from keras.applications.resnet50 import preprocess_input, decode_predictions
+
+# [DEP] from scipy.misc import imsave
 from PIL import Image
+#from scipy import misc
+from skimage.future import graph
 import numpy as np
 import copy
-import os
-import time
-import sys
-sys.path.insert(1, './src')
-import util
+import os, time, sys
+import random
+import cv2
+import src.util
 import seaborn as sns
 ## seaborn has white grid by default so I will get rid of this.
 sns.set_style("whitegrid", {'axes.grid' : False})
@@ -27,59 +31,65 @@ def dir2list(names,listname):
         f.write(name.split(".")[0] + '\n')
     f.close()
 
-def getImageArr(path, width, height):
-    img_org = Image.open(path)
-    img = np.float32(np.array(img_org.resize((width, height)))) / 127.5 - 1
-    return img
+# def getImageArr(path, width, height):
+#     img_org = Image.open(path)
+#     img = np.float32(np.array(img_org.resize((width, height)))) / 127.5 - 1
+#     return img
+#
+# def getSegmentationArr(path, width, height,nb_classes):
+#     seg_labels = np.zeros((height, width, nb_classes))
+#     img_org = Image.open(path)
+#     img = np.array(img_org.resize((width, height)))
+#     #img = img[:, :, 0]
+#
+#     for c in range(nb_classes):
+#         seg_labels[:, :, c] = (img == c).astype(int)
+#     ##seg_labels = np.reshape(seg_labels, ( width*height,nClasses  ))
+#     return seg_labels
 
-def getSegmentationArr(path, width, height,nb_classes):
-    seg_labels = np.zeros((height, width, nb_classes))
-    img_org = Image.open(path)
-    img = np.array(img_org.resize((width, height)))
-    #img = img[:, :, 0]
-
-    for c in range(nb_classes):
-        seg_labels[:, :, c] = (img == c).astype(int)
-    ##seg_labels = np.reshape(seg_labels, ( width*height,nClasses  ))
-    return seg_labels
-
-def getImageLabelsPairs(dir_img,dir_lbls, input_width, input_height, output_width, output_height,nb_classes):
-    images = os.listdir(dir_img)
-    images.sort()
-    segmentations = os.listdir(dir_lbls)
-    segmentations.sort()
-
-    X = []
-    Y = []
-    for im, seg in zip(images, segmentations):
-        X.append(getImageArr(dir_img + im, input_width, input_height))
-        Y.append(getSegmentationArr(dir_lbls + seg, nb_classes, output_width, output_height))
-
-    X, Y = np.array(X), np.array(Y)
-    print(X.shape, Y.shape)
-    return [X,Y]
-
-def load_image(path,INPUT_SIZE):
-    img_org = Image.open(path)
-    w, h = img_org.size
+# def getImageLabelsPairs(dir_img,dir_lbls, input_width, input_height, output_width, output_height,nb_classes):
+#     images = os.listdir(dir_img)
+#     images.sort()
+#     segmentations = os.listdir(dir_lbls)
+#     segmentations.sort()
+#
+#     X = []
+#     Y = []
+#     for im, seg in zip(images, segmentations):
+#         X.append(getImageArr(dir_img + im, input_width, input_height))
+#         Y.append(getSegmentationArr(dir_lbls + seg, nb_classes, output_width, output_height))
+#
+#     X, Y = np.array(X), np.array(Y)
+#     print(X.shape, Y.shape)
+#     return [X,Y]
+#
+def load_image(img_org,INPUT_SIZE):
+    #img_org = Image.open(path)
+    #w, h = img_org.size
+    h, w, c = img_org.shape
     if INPUT_SIZE == None:
-        img = img_org.resize(((w // 32) * 32, (h // 32) * 32))
+        #img = img_org.resize(((w // 32) * 32, (h // 32) * 32))
+        img = cv2.resize(img_org, ((w // 32) * 32, (h // 32) * 32))
     else:
         # if the input size is fixed:
-        img = img_org.resize((INPUT_SIZE,INPUT_SIZE))
+        #img = img_org.resize((INPUT_SIZE,INPUT_SIZE))
+        img = cv2.resize(img_org, (INPUT_SIZE, INPUT_SIZE))
     img = np.array(img, dtype=np.float32)
     x = np.expand_dims(img, axis=0)
     x = preprocess_input(x)
     return x
 
-def load_label(path,INPUT_SIZE,nb_classes):
-    img_org = Image.open(path)
-    w, h = img_org.size
+def load_label(img_org,INPUT_SIZE,nb_classes):
+    #img_org = Image.open(path)
+    #w, h = img_org.size
+    h, w, c = img_org.shape
     if INPUT_SIZE == None:
-        img = img_org.resize(((w//32)*32, (h//32)*32))
+        #img = img_org.resize(((w//32)*32, (h//32)*32))
+        img = cv2.resize(img_org,((w // 32) * 32, (h // 32) * 32))
     else:
         # if the input size is fixed:
-        img = img_org.resize((INPUT_SIZE, INPUT_SIZE))
+        #img = img_org.resize((INPUT_SIZE, INPUT_SIZE))
+        img = cv2.resize(img_org,(INPUT_SIZE, INPUT_SIZE))
     img = np.array(img, dtype=np.uint8)
     img[img==255] = 0
     y = np.zeros((1, img.shape[0], img.shape[1], nb_classes), dtype=np.float32)
@@ -90,19 +100,44 @@ def load_label(path,INPUT_SIZE,nb_classes):
             y[0, i, j, img[i][j]] = 1
     return y
 
-def generate_arrays_from_file(path, image_dir, label_dir, INPUT_SIZE,nb_classes):
+def generate_arrays_from_file(path, image_dir, label_dir, INPUT_SIZE,nb_classes, dataaug_args):
+    batch_size = dataaug_args.batchsize
+    sample_counter = 0
+    X = []
+    Y = []
     while 1:
         f = open(path)
         for line in f:
             filename = line.rstrip('\n')
             path_image = os.path.join(image_dir, filename+'.jpg')
+            img_org = cv2.imread(path_image)
             path_label = os.path.join(label_dir, filename+'.png')
-            x = load_image(path_image,INPUT_SIZE)
-            y = load_label(path_label,INPUT_SIZE,nb_classes)
-            yield (x, y)
+            lbl_org = cv2.imread(path_label)
+
+            if dataaug_args is None:
+                img, lbl = img_org, lbl_org
+            else:
+                img, lbl = data_augmentation(dataaug_args, img_org, lbl_org)
+
+            x = load_image(img,INPUT_SIZE)
+            y = load_label(lbl,INPUT_SIZE,nb_classes)
+
+            X.append(x)
+            Y.append(y)
+
+            sample_counter += 1
+            #print(sample_counter)
+
+            if sample_counter == batch_size:
+                X, Y = np.array(X)[:, 0, :, :, :], np.array(Y)[:, 0, :, :, :]
+                yield (X, Y)
+                sample_counter = 0
+                X = []
+                Y = []
+    #        yield (x, y)
         f.close()
 
-def extract_arrays_from_file(path, image_dir, label_dir, INPUT_SIZE,nb_classes):
+def extract_arrays_from_file(path, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args):
     X = []
     Y = []
     f = open(path)
@@ -113,17 +148,56 @@ def extract_arrays_from_file(path, image_dir, label_dir, INPUT_SIZE,nb_classes):
         line = content[ii]
         filename = line.rstrip('\n')
         #print(filename)
+        # load image and label:
         path_image = os.path.join(image_dir, filename+'.jpg')
+        img_org = cv2.imread(path_image)
         path_label = os.path.join(label_dir, filename+'.png')
-        x = load_image(path_image, INPUT_SIZE)
-        y = load_label(path_label, INPUT_SIZE, nb_classes)
-        #pdb.set_trace()
+        lbl_org = cv2.imread(path_label)
+        #
+        #data_augmentation(dataaug_args, img_org, lbl_org)
+        #
+        x = load_image(img_org, INPUT_SIZE)
+        y = load_label(lbl_org, INPUT_SIZE, nb_classes)
+
         X.append(x)
         Y.append(y)
     f.close()
  #   X, Y = np.array(X), np.array(Y)
     print('done!')
     return [X,Y]
+
+
+# ------------------
+# Generate segmentations:
+# ------------------
+
+def create_RAG(image_path, compactness,num_segments,threshold):
+    img_org = Image.open(image_path)
+    img = np.array(img_org, dtype=np.float32)
+    labels1 = segmentation.slic(img_org, compactness=compactness, n_segments=num_segments)
+    out1 = color.label2rgb(labels1, img, kind='avg')
+
+    g = graph.rag_mean_color(img, labels1)
+    labels2 = graph.cut_threshold(labels1, g, threshold)
+    out2 = color.label2rgb(labels2, img, kind='avg')
+    #misc.imsave('./RAG_other/'+name, out2)
+    return out2
+
+
+def load_segmentations(dirpath,list_of_images,INPUT_SIZE):
+    folder_array = []
+    #img_names = dir2list(dirpath)
+    f = open(list_of_images,'r')
+    content = f.readlines()
+    for indx in range(len(content)):
+        line = content[indx]
+        filename = line.rstrip('\n')
+        #pdb.set_trace()
+        #folder_array.append(getImageArr(dirpath+filename+'.jpg', INPUT_SIZE,INPUT_SIZE))
+        folder_array.append(load_image(dirpath+filename+'.jpg', INPUT_SIZE)[0, :, :])
+
+    folder_array = np.array(folder_array)
+    return folder_array
 
 # -----------------------
 # Initiate model weights
@@ -165,39 +239,65 @@ def compute_median_frequency_reweighting(Yi):
     return median_frequency_coef
 
 # -----------------------
+# Data augmentation
+# -----------------------
+def data_augmentation(args, input_image, output_image):
+    # Data augmentation
+    #input_image, output_image = utils.random_crop(input_image, output_image, args.crop_height, args.crop_width)
+
+    if args.h_flip and random.randint(0,1):
+        input_image = cv2.flip(input_image, 1)
+        output_image = cv2.flip(output_image, 1)
+    if args.v_flip and random.randint(0,1):
+        input_image = cv2.flip(input_image, 0)
+        output_image = cv2.flip(output_image, 0)
+    if args.brightness:
+        factor = 1.0 + random.uniform(-1.0*args.brightness, args.brightness)
+        table = np.array([((i / 255.0) * factor) * 255 for i in np.arange(0, 256)]).astype(np.uint8)
+        input_image = cv2.LUT(input_image, table)
+    if args.rotation:
+        angle = random.uniform(-1*args.rotation, args.rotation)
+    if args.rotation:
+        M = cv2.getRotationMatrix2D((input_image.shape[1]//2, input_image.shape[0]//2), angle, 1.0)
+        input_image = cv2.warpAffine(input_image, M, (input_image.shape[1], input_image.shape[0]), flags=cv2.INTER_NEAREST)
+        output_image = cv2.warpAffine(output_image, M, (output_image.shape[1], output_image.shape[0]), flags=cv2.INTER_NEAREST)
+
+    return input_image, output_image
+
+# -----------------------
 # Predict
 # -----------------------
-def model_predict(model, input_path, output_path):
-    img_org = Image.open(input_path)
-    w, h = img_org.size
-    img = img_org.resize(((w//32)*32, (h//32)*32))
-    img = np.array(img, dtype=np.float32)
-    x = np.expand_dims(img, axis=0)
-    x = preprocess_input(x)
-    pred = model.predict(x)
-    pred = pred[0].argmax(axis=-1).astype(np.uint8)
-    img = Image.fromarray(pred, mode='P')
-    img = img.resize((w, h))
-    palette_im = Image.open('palette.png')
-    img.palette = copy.copy(palette_im.palette)
-    img.save(output_path)
-
-def model_predict_gby(model, input_path, output_path,INPUT_SIZE):
-    img_org = Image.open(input_path)
-    ww, hh = img_org.size
-    if INPUT_SIZE==None:
-        img = img_org.resize(((ww//32)*32, (hh//32)*32))
-    else:
-        # if the input size is fixed:
-        img = img_org.resize((INPUT_SIZE, INPUT_SIZE))
-    img = np.array(img, dtype=np.float32)
-    x = np.expand_dims(img, axis=0)
-    x = preprocess_input(x)
-    probs = model.predict(x)
-    #pdb.set_trace()
-    print(probs)
-    segmentation = util.get_label_image(probs[0,:,:,:], hh, ww)
-    segmentation.save(output_path)
+# def model_predict(model, input_path, output_path):
+#     img_org = Image.open(input_path)
+#     w, h = img_org.size
+#     img = img_org.resize(((w//32)*32, (h//32)*32))
+#     img = np.array(img, dtype=np.float32)
+#     x = np.expand_dims(img, axis=0)
+#     x = preprocess_input(x)
+#     pred = model.predict(x)
+#     pred = pred[0].argmax(axis=-1).astype(np.uint8)
+#     img = Image.fromarray(pred, mode='P')
+#     img = img.resize((w, h))
+#     palette_im = Image.open('palette.png')
+#     img.palette = copy.copy(palette_im.palette)
+#     img.save(output_path)
+#
+# def model_predict_gby(model, input_path, output_path,INPUT_SIZE):
+#     img_org = Image.open(input_path)
+#     ww, hh = img_org.size
+#     if INPUT_SIZE==None:
+#         img = img_org.resize(((ww//32)*32, (hh//32)*32))
+#     else:
+#         # if the input size is fixed:
+#         img = img_org.resize((INPUT_SIZE, INPUT_SIZE))
+#     img = np.array(img, dtype=np.float32)
+#     x = np.expand_dims(img, axis=0)
+#     x = preprocess_input(x)
+#     probs = model.predict(x)
+#     #pdb.set_trace()
+#     print(probs)
+#     segmentation = util.get_label_image(probs[0,:,:,:], hh, ww)
+#     segmentation.save(output_path)
 
 # -----------------------
 # Evaluation

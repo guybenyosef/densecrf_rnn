@@ -22,6 +22,7 @@ def argument_parser_eval():
     parser.add_argument('-w', '--weights', default=None, nargs='?', const=None, help='The absolute path of the weights',type=str)
     parser.add_argument('-ds', '--dataset', default='streets', help='The name of train/test sets', type=str)
     parser.add_argument('-vb', '--verbosemode', default=1, help='Specify the verbose mode',type=int)
+    parser.add_argument('-is', '--inputsize', default=512, help='Specify the input size N, where N=rows,N=cols. ',type=int)
     return parser.parse_args()
 
 # ===========================
@@ -56,9 +57,10 @@ if __name__ == '__main__':
     # LOAD train data:
     # ===============
 
-    INPUT_SIZE = 224  # #500 #224 #512 # NOTE: Extract from model
+    INPUT_SIZE = args.inputsize  # #500 #224 #512 # NOTE: Extract from model
 
-    ds = load_dataset(args.dataset, INPUT_SIZE)
+    dataaug_args = None
+    ds = load_dataset(args.dataset, INPUT_SIZE, dataaug_args)
     print(ds.X_train.shape, ds.y_train.shape)
     print(ds.X_test.shape, ds.y_test.shape)
     nb_classes = ds.nb_classes

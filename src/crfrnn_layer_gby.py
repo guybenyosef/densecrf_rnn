@@ -77,7 +77,6 @@ class CrfRnnLayer_GBY(Layer):
         bilateral_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=True,
                                                             theta_alpha=self.theta_alpha,
                                                             theta_beta=self.theta_beta)
-
         Q  = unaries
 
         # Iterate:

@@ -2,8 +2,6 @@
 MIT License
 
 """
-
-
 #from keras.callbacks import ModelCheckpoint
 #from keras.optimizers import Adam
 #from keras.optimizers import SGD
@@ -13,7 +11,7 @@ import pdb
 from models_gby import load_model_gby
 from datasets_gby import load_dataset
 #from models_gby import fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
-from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters,compute_median_frequency_reweighting
+from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters,compute_median_frequency_reweighting,load_segmentations
 
 ## Import usual libraries
 import os
@@ -38,12 +36,19 @@ RES_DIR = "/storage/gby/semseg/"
 def argument_parser():
     parser = argparse.ArgumentParser(description='Process arguments')
     parser.add_argument('-m', '--model', default='fcn_RESNET50_8s', help='choose between \'fcn_VGG16_32s\',\'fcn_VGG16_8s\',\'fcn_RESNET50_32s\', and \'fcn_RESNET50_8s\' networks, with or without \'_crfrnn\' suffix', type=str)
-    parser.add_argument('-ds', '--dataset', default='streets', help='The name of train/test sets', type=str)
+    parser.add_argument('-ds', '--dataset', default='horsecoarse', help='The name of train/test sets', type=str)
     parser.add_argument('-bs', '--batchsize', default=1, help='Specify the number of batches', type=int)
-    parser.add_argument('-is', '--inputsize', default=None, help='Specify the input size N, where N=rows,N=cols. ', type=int)
+    parser.add_argument('-is', '--inputsize', default=512, help='Specify the input size N, where N=rows,N=cols. ', type=int)
     parser.add_argument('-w', '--weights', default=None, nargs='?', const=None, help='The absolute path of the weights', type=str)
     parser.add_argument('-e', '--epochs', default=1, const=None, help='Specify the number of epochs to train', type=int)
-    parser.add_argument('-vb', '--verbosemode', default=1, help='Specify the verbose mode',type=int)
+    parser.add_argument('-vb', '--verbosemode', default=1, help='Specify the verbose mode', type=int)
+    parser.add_argument('-hf', '--h_flip', default=False, help='Whether to randomly flip the image horizontally for data augmentation', type=bool)
+    parser.add_argument('-vf', '--v_flip', default=False, help='Whether to randomly flip the image vertically for data augmentation', type=bool)
+    parser.add_argument('-br', '--brightness', type=float, default=None,
+                        help='Whether to randomly change the image brightness for data augmentation. Specifies the max bightness change as a factor between 0.0 and 1.0. For example, 0.1 represents a max brightness change of 10%% (+-).')
+    parser.add_argument('-ro', '--rotation', type=float, default=None,
+                        help='Whether to randomly rotate the image for data augmentation. Specifies the max rotation angle in degrees.')
+    parser.add_argument('-se', '--stepsepoch', default=100, help='Specify the number of steps for epoch', type=int)
 
     return parser.parse_args()
 
@@ -80,11 +85,20 @@ if __name__ == '__main__':
 
     INPUT_SIZE = args.inputsize  #500 #224 #512
 
-    ds = load_dataset(args.dataset,INPUT_SIZE)
+    # parameters for data sugmentation:
+    # dataaug_args = {}
+    # dataaug_args.h_flip = args.h_flip
+    # dataaug_args.v_flip = args.v_flip
+    # dataaug_args.brightness = args.brightness
+    # dataaug_args.rotation = args.rotation
+
+    ds = load_dataset(args.dataset, INPUT_SIZE, args) #dataaug_args)
     print(ds.X_train.shape, ds.y_train.shape)
     print(ds.X_test.shape, ds.y_test.shape)
     nb_classes = ds.nb_classes
 
+   # with tf.device('/cpu:0'):
+   #     input_image, output_image = data_augmentation(input_image, output_image)
     # ===============
     # LOAD model:
     # ===============
@@ -96,10 +110,23 @@ if __name__ == '__main__':
 
     # if resuming training:
     if (args.weights is not None) and (os.path.exists(args.weights)):
+        print("loading weights %s.."% args.weights)
         model.load_weights(args.weights)
 
     model.summary()
     print('trining model %s..'% model.name)
+
+    # ===============
+    # LOAD sp segment:
+    # ===============
+    if model.sp_flag:
+        segments_train = load_segmentations(ds.segments_dir, ds.train_list, INPUT_SIZE)
+        segments_test = load_segmentations(ds.segments_dir, ds.test_list, INPUT_SIZE)
+        print("Loading superpixels segmentations:")
+        print(segments_train.shape, segments_test.shape)
+        ds.X_train = [ds.X_train, segments_train]
+        ds.X_test = [ds.X_test, segments_test]
+
 
     # ===============
     # TRAIN model:
@@ -127,21 +154,33 @@ if __name__ == '__main__':
     if model.crf_flag:
         model.compile(loss=weighted_loss(nb_classes, coefficients),
                       optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001),
-                      metrics=['accuracy']  )
+                      metrics=['accuracy'])
     else:
         model.compile(loss='categorical_crossentropy',
                       optimizer='sgd',
-                      metrics=['accuracy'],
-                      callbacks=['csv_logger'])
+                      metrics=['accuracy'])
+                      #callbacks=['csv_logger'])
 
-    hist1 = model.fit(ds.X_train, ds.y_train,
+
+    #pdb.set_trace()
+    # option 1:
+    # hist1 = model.fit(ds.X_train, ds.y_train,
+    #                   validation_data=(ds.X_test, ds.y_test),
+    #                   batch_size=batch_size, epochs=num_epochs, verbose=verbose_mode)
+    # option 2: use data generator for data augmentation
+    hist1 = model.fit_generator(generator=ds.datagen_train,
                       validation_data=(ds.X_test, ds.y_test),
-                      batch_size=batch_size, epochs=num_epochs, verbose=verbose_mode)
+                      steps_per_epoch=args.stepsepoch,
+                      use_multiprocessing=True,
+                      epochs=num_epochs, verbose=verbose_mode)
+
 
     # ===============
     # SAVE model:
     # ===============
-    model.save_weights(RES_DIR + args.dataset + '_weights_' + model.name + '_' + str(num_epochs) + 'ep')
+    save_by_name = RES_DIR + args.dataset + '_weights_' + model.name + '_' + str(num_epochs) + 'ep'
+    model.save_weights(save_by_name)
+    print("model saved to %s"%save_by_name)
 
     # ===============
     # ANALYZE model:
@@ -149,6 +188,17 @@ if __name__ == '__main__':
     save_graphics_mode = False
     print_IoU_flag = True
     visualize_filters_flag = False
+
+    # Compute IOU:
+    # ------------
+    if (print_IoU_flag):
+        print('computing mean IoU for validation set..')
+        y_pred = model.predict(ds.X_test, batch_size=batch_size, verbose=verbose_mode)
+        y_predi = np.argmax(y_pred, axis=3)
+        y_testi = np.argmax(ds.y_test, axis=3)
+        print(y_testi.shape, y_predi.shape)
+        IoU_ver2(y_testi, y_predi)
+        # pdb.set_trace()
 
     # Visualize conv filters:
     # -------------------------------------
@@ -167,17 +217,6 @@ if __name__ == '__main__':
         plt.legend()
         #plt.show(block=False)
         plt.savefig('loss_plot.pdf')
-
-    # Compute IOU:
-    # ------------
-    if(print_IoU_flag):
-        print('computing mean IoU for validation set..')
-        y_pred = model.predict(ds.X_test, batch_size=batch_size, verbose=verbose_mode)
-        y_predi = np.argmax(y_pred, axis=3)
-        y_testi = np.argmax(ds.y_test, axis=3)
-        print(y_testi.shape, y_predi.shape)
-        IoU_ver2(y_testi, y_predi)
-        #pdb.set_trace()
 
     # Visualize the model performance:
     # --------------------------------

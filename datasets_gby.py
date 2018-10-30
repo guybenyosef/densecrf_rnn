@@ -1,7 +1,8 @@
 
 import os
 import numpy as np
-from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,dir2list
+#from utils_gby import generate_arrays_from_file,extract_arrays_from_file,IoU,model_predict_gby,getImageArr,getSegmentationArr,dir2list
+from utils_gby import dir2list,extract_arrays_from_file,generate_arrays_from_file
 from sklearn.utils import shuffle
 #from random import shuffle
 
@@ -26,43 +27,44 @@ def create_train_test_lists(dirname,train_list_name,test_list_name,train_rate):
     dir2list(names[:train_ind], train_list_name)
     dir2list(names[train_ind:], test_list_name)
 
-def split_train_test(image_dir,label_dir, train_rate, allow_randomness, INPUT_SIZE, nb_classes):
+# def split_train_test(image_dir,label_dir, train_rate, allow_randomness, INPUT_SIZE, nb_classes):
+#
+#     images = os.listdir(image_dir)
+#     images.sort()
+#     segmentations = os.listdir(label_dir)
+#     segmentations.sort()
+#     #
+#     X = []
+#     Y = []
+#     for im, seg in zip(images, segmentations):
+#         X.append(getImageArr(image_dir + im, INPUT_SIZE, INPUT_SIZE))
+#         Y.append(getSegmentationArr(label_dir + seg, INPUT_SIZE, INPUT_SIZE, nb_classes))
+#     X, Y = np.array(X), np.array(Y)
+#     print(X.shape, Y.shape)
+#     # Split between training and testing data:
+#     # -----------------------------------------
+#
+#     if allow_randomness:
+#         index_train = np.random.choice(X.shape[0], int(X.shape[0] * train_rate), replace=False)
+#         index_test = list(set(range(X.shape[0])) - set(index_train))
+#         X, Y = shuffle(X, Y)
+#         X_train, y_train = X[index_train], Y[index_train]
+#         X_test, y_test = X[index_test], Y[index_test]
+#     else:
+#         index_train = int(X.shape[0] * train_rate)  # NOTE
+#         X_train, y_train = X[0:index_train], Y[0:index_train]
+#         X_test, y_test = X[index_train:-1], Y[index_train:-1]  # NOTE -1
+#
+#     return datas(X_train, y_train, X_test, y_test, INPUT_SIZE, nb_classes)
 
-    images = os.listdir(image_dir)
-    images.sort()
-    segmentations = os.listdir(label_dir)
-    segmentations.sort()
-    #
-    X = []
-    Y = []
-    for im, seg in zip(images, segmentations):
-        X.append(getImageArr(image_dir + im, INPUT_SIZE, INPUT_SIZE))
-        Y.append(getSegmentationArr(label_dir + seg, INPUT_SIZE, INPUT_SIZE, nb_classes))
-    X, Y = np.array(X), np.array(Y)
-    print(X.shape, Y.shape)
-    # Split between training and testing data:
-    # -----------------------------------------
 
-    if allow_randomness:
-        index_train = np.random.choice(X.shape[0], int(X.shape[0] * train_rate), replace=False)
-        index_test = list(set(range(X.shape[0])) - set(index_train))
-        X, Y = shuffle(X, Y)
-        X_train, y_train = X[index_train], Y[index_train]
-        X_test, y_test = X[index_test], Y[index_test]
-    else:
-        index_train = int(X.shape[0] * train_rate)  # NOTE
-        X_train, y_train = X[0:index_train], Y[0:index_train]
-        X_test, y_test = X[index_train:-1], Y[index_train:-1]  # NOTE -1
-
-    return datas(X_train, y_train, X_test, y_test, INPUT_SIZE, nb_classes)
-
-
-def split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes):
+def split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args):
 
     print('training data:')
-    [train_imgs, train_labels] = extract_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    #[train_imgs, train_labels] = extract_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
     print('validation data:')
-    [val_imgs, val_labels] = extract_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    [val_imgs, val_labels] = extract_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
+    train_imgs, train_labels = val_imgs, val_labels
     #
     X_train, y_train = np.array(train_imgs)[:, 0, :, :, :], np.array(train_labels)[:, 0, :, :, :]
     X_test, y_test = np.array(val_imgs)[:, 0, :, :, :], np.array(val_labels)[:, 0, :, :, :]
@@ -73,96 +75,47 @@ def split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_c
 # dataset types:
 # ===================
 
-def streets(INPUT_SIZE):
+def streets(INPUT_SIZE, dataaug_args):
 
     nb_classes = 11+1
 
+    train_data = 'lst/voc2012_train.txt'  # to fix
+    val_data = 'lst/voc2012_val.txt'  # to fix
     image_dir = '/storage/gby/datasets/streets/images_prepped_train/'
     label_dir = '/storage/gby/datasets/streets/annotations_prepped_train/'
+    segments_dir = ''
 
-    train_rate = 0.85
-    allow_randomness = False
-    ds = split_train_test(image_dir,label_dir, train_rate, allow_randomness, INPUT_SIZE, nb_classes)
+    #train_rate = 0.85
+    #allow_randomness = False
+    #ds = split_train_test(image_dir,label_dir, train_rate, allow_randomness, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
 
-    # Median Frequency Alpha Coefficients
-    coefficients = {0: 0.0237995754847,
-                    1: 0.144286494916,
-                    2: 0.038448897913,
-                    3: 1.33901803472,
-                    4: 1.0,
-                    5: 0.715098627127,
-                    6: 4.20827446939,
-                    7: 1.58754122255,
-                    8: 0.0551054437019,
-                    9: 0.757994265912,
-                    10: 0.218245600783,
-                    11: 0.721125616748
-    #                12: 6.51048559366,
-    #                13: 0.125434198729,
-    #                14: 3.27995580458,
-    #                15: 3.72813940546,
-    #                16: 3.76817843552,
-    #                17: 8.90686657342,
-    #                18: 2.12162414027,
-    #                19: 0.
-                    }
-
-    # for python 2.7:
-    # coefficients = [key for index,key in coefficients.iteritems()]
-    # python 3:
-    coefficients = [key for index, key in coefficients.items()]
-
-    ds.weighted_loss_coefficients = coefficients
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
 
     return ds
 
 
-def voc2012(INPUT_SIZE):
+def voc2012(INPUT_SIZE, dataaug_args):
 
     nb_classes = 20+1
 
-    train_data = 'lst/voc2012_train2.txt'
-    val_data = 'lst/voc2012_val2.txt'
+    train_data = 'lst/voc2012_train.txt'
+    val_data = 'lst/voc2012_val.txt'
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
     label_dir = '/storage/gby/datasets/pascal_voc12/labels_orig/'
+    segments_dir = ''
 
-    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
 
-    # Median Frequency Alpha Coefficients
-    coefficients = {
-             0: 3.772978369033286,
-             1: 1.89431801672104,
-             2: 1.8857878994401478,
-             3: 1.7128794137720464,
-             4: 1.606830920261937,
-             5: 1.388255758943193,
-             6: 1.2817089685863616,
-             7: 1.2690787118706317,
-             8: 1.252809975220461,
-             9: 1.2178819913716592,
-             10: 1.0,
-             11: 0.9904626431598804,
-             12: 0.8460681114917294,
-             13: 0.8186828295823247,
-             14: 0.7920569266234229,
-             15: 0.7181024326358014,
-             16: 0.6584863672800914,
-             17: 0.6538706954119894,
-             18: 0.4237074630711668,
-             19: 0.23850667393139946,
-             20: 0.01571903401130907
-    }
-
-    # for python 2.7:
-    # coefficients = [key for index,key in coefficients.iteritems()]
-    # python 3:
-    coefficients = [key for index, key in coefficients.items()]
-
-    ds.weighted_loss_coefficients = coefficients
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
 
     return ds
 
-def horsecoarse(INPUT_SIZE):
+def horsecoarse(INPUT_SIZE,dataaug_args):
 
     nb_classes = 5+1
     #horse: head, tail, torso, upper legs, lower legs
@@ -171,18 +124,20 @@ def horsecoarse(INPUT_SIZE):
     val_data = 'lst/horsecoarse_test.txt'
     #image_dir = "/storage/gby/datasets/horse_coarse_parts/images_orig/"
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
-    label_dir = "/storage/gby/datasets/horse_coarse_parts/labels_orig/"
+    label_dir = '/storage/gby/datasets/horse_coarse_parts/labels_orig/'
+    segments_dir = '/storage/gby/datasets/horse_coarse_parts/RAG/'
 
-    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
 
-    # Median Frequency Alpha Coefficients
-    coefficients = {}
-
-    ds.weighted_loss_coefficients = coefficients
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
+    ds.datagen_train = generate_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE,nb_classes, dataaug_args)
+    ds.datagen_test = generate_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, None)
 
     return ds
 
-def horsefine(INPUT_SIZE):
+def horsefine(INPUT_SIZE, dataaug_args):
 
     nb_classes = 21+1
 
@@ -191,17 +146,17 @@ def horsefine(INPUT_SIZE):
     #image_dir = "/storage/gby/datasets/horse_coarse_parts/images_orig/"
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
     label_dir = '/storage/gby/datasets/horse_fine_parts/labels_orig/'
+    segments_dir = ''
 
-    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
 
-    # Median Frequency Alpha Coefficients
-    coefficients = {}
-
-    ds.weighted_loss_coefficients = coefficients
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
 
     return ds
 
-def personcoarse(INPUT_SIZE):
+def personcoarse(INPUT_SIZE, dataaug_args):
 
     nb_classes = 6+1
     #person: head, torso, upper/lower arms and legs
@@ -210,18 +165,18 @@ def personcoarse(INPUT_SIZE):
     val_data = 'lst/personcoarse_test.txt'
     #image_dir = "/storage/gby/datasets/horse_coarse_parts/images_orig/"
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
-    label_dir = "/storage/gby/datasets/person_coarse_parts/labels_orig/"
+    label_dir = '/storage/gby/datasets/person_coarse_parts/labels_orig/'
+    segments_dir = ''
 
-    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
 
-    # Median Frequency Alpha Coefficients
-    coefficients = {}
-
-    ds.weighted_loss_coefficients = coefficients
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
 
     return ds
 
-def personfine(INPUT_SIZE):
+def personfine(INPUT_SIZE, dataaug_args):
 
     nb_classes = 24+1
 
@@ -230,13 +185,13 @@ def personfine(INPUT_SIZE):
     #image_dir = "/storage/gby/datasets/horse_coarse_parts/images_orig/"
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
     label_dir = '/storage/gby/datasets/person_fine_parts/labels_orig/'
+    segments_dir = ''
 
-    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes)
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
 
-    # Median Frequency Alpha Coefficients
-    coefficients = {}
-
-    ds.weighted_loss_coefficients = coefficients
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
 
     return ds
 
@@ -244,27 +199,27 @@ def personfine(INPUT_SIZE):
 # load:
 # ===================
 
-def load_dataset(ds_name,INPUT_SIZE):
+def load_dataset(ds_name,INPUT_SIZE, dataaug_args):
 
     print('loading dataset : %s..'% ds_name)
 
     if ds_name == 'streets':
-        ds = streets(INPUT_SIZE)
+        ds = streets(INPUT_SIZE, dataaug_args)
 
     elif ds_name == 'voc2012':
-        ds = voc2012(INPUT_SIZE)
+        ds = voc2012(INPUT_SIZE, dataaug_args)
 
     elif ds_name == 'horsecoarse':
-        ds = horsecoarse(INPUT_SIZE)
+        ds = horsecoarse(INPUT_SIZE, dataaug_args)
 
     elif ds_name == 'horsefine':
-        ds = horsefine(INPUT_SIZE)
+        ds = horsefine(INPUT_SIZE, dataaug_args)
 
     elif ds_name == 'personcoarse':
-        ds = personcoarse(INPUT_SIZE)
+        ds = personcoarse(INPUT_SIZE, dataaug_args)
 
     elif ds_name == 'personfine':
-        ds = personfine(INPUT_SIZE)
+        ds = personfine(INPUT_SIZE, dataaug_args)
 
     else:
         print('ERROR: dataset name does not exist..')

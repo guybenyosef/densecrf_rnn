@@ -8,9 +8,7 @@ from keras.applications.resnet50 import ResNet50
 from utils_gby import bilinear_upsample_weights
 import sys
 sys.path.insert(1, './src')
-from crfrnn_layer import CrfRnnLayer
-from crfrnn_layer_sp import CrfRnnLayerSP
-from crfrnn_layer_gby import CrfRnnLayer_GBY
+from crfrnn_layer import CrfRnnLayer,CrfRnnLayerSP,CrfRnnLayerSPIO
 
 # -----------------------
 # Model design
@@ -58,8 +56,9 @@ def fcn_VGG16_32s(INPUT_SIZE,nb_classes):
     model = Model(inputs=inputs, output=fcn_output, name='fcn_VGG16_32s')
 
     # Fixing weighs in lower layers
-    for layer in model.layers[:15]:  # sometimes I use it, sometimes not.
-        layer.trainable = False
+    # for layer in model.layers[:15]:  # sometimes I use it, sometimes not.
+    #     layer.trainable = False
+
     return model
 
 
@@ -88,8 +87,8 @@ def fcn_VGG16_32s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
                              name='crfrnn')([fcn_score, inputs])
 
     model = Model(inputs=inputs, output=crfrnn_output, name='fcn_VGG16_32s_crfrnn')
-    return model
 
+    return model
 
 
 def fcn_VGG16_8s(INPUT_SIZE,nb_classes):    # previous name: fcn8s_take2
@@ -173,10 +172,10 @@ def fcn_VGG16_8s(INPUT_SIZE,nb_classes):    # previous name: fcn8s_take2
     model = Model(inputs=inputs, outputs=output, name='fcn_VGG16_8s')
 
     # Fixing weighs in lower layers
-    for layer in model.layers[:15]:  # sometimes I use it, sometimes not.
-        layer.trainable = False
-    return model
+    # for layer in model.layers[:15]:  # sometimes I use it, sometimes not.
+    #     layer.trainable = False
 
+    return model
 
 
 def fcn_VGG16_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
@@ -208,8 +207,8 @@ def fcn_VGG16_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
     model = Model(inputs=inputs, output=crfrnn_output, name='fcn_VGG16_8s_crfrnn')
 
     # # Fixing weighs in lower layers (optional)
-    for layer in model.layers[:28]:  # 15,21,29 (overall 30 layers)
-         layer.trainable = True
+    # for layer in model.layers[:28]:  # 15,21,29 (overall 30 layers)
+    #      layer.trainable = True
 
     return model
 
@@ -534,12 +533,14 @@ def fcn_RESNET50_8s(INPUT_SIZE,nb_classes):
 
 
 def fcn_RESNET50_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
-    """ Returns Keras FCN-8 + based on ResNet50 model definition.
+    """ Returns Keras FCN-8 + CRFRNNlayer, based on ResNet50 model definition.
 
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
     #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
-    saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
+    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
+    saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_500ep'
+
     fcn.load_weights(saved_model_path)
 
     inputs = fcn.layers[0].output
@@ -566,6 +567,87 @@ def fcn_RESNET50_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
     return model
 
 
+def fcn_RESNET50_8s_crfrnnSP(INPUT_SIZE,nb_classes,num_crf_iterations):
+    """ Returns Keras FCN-8 + CRFRNNlayer with SP, based on ResNet50 model definition.
+
+    """
+    fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
+    #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
+    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
+    saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep'
+
+    fcn.load_weights(saved_model_path)
+
+    # two inputs:
+    img_input = fcn.layers[0].output
+    #seg_input = fcn.layers[0].output
+    seg_input = Input(shape=(INPUT_SIZE, INPUT_SIZE, 3))
+
+    #fcn_score = fcn.output
+    fcn_score = fcn.get_layer('add_pred8_pred16_pred32').output
+
+    # Adding the crfrnn layer:
+    height, weight = INPUT_SIZE, INPUT_SIZE
+    crfrnn_output = CrfRnnLayerSP(image_dims=(height, weight),
+                                num_classes=nb_classes,
+                                theta_alpha=160.,
+                                theta_beta=90.,
+                                theta_gamma=3.,
+                                num_iterations=num_crf_iterations,  # 10 for test, 5 for train
+                                bil_rate=0.5,  # add for the segmentation
+                                theta_alpha_seg=160, #30,  # add for the segmentation
+                                name='crfrnn')([fcn_score, img_input, seg_input])
+
+    model = Model(inputs=[img_input, seg_input], outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnnSP')
+
+
+    # Fixing weighs in lower layers (optional)
+    # for layer in model.layers[:29]:  # 15,21,29 (overall 30 layers)
+    #     layer.trainable = False
+
+    return model
+
+
+def fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE,nb_classes,num_crf_iterations):
+    """ Returns Keras FCN-8 + CRFRNNlayer with SP term and Inside/outside term, based on ResNet50 model definition.
+
+    """
+    fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
+    #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
+    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
+    saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep'
+
+    fcn.load_weights(saved_model_path)
+
+    # two inputs:
+    img_input = fcn.layers[0].output
+    #seg_input = fcn.layers[0].output
+    seg_input = Input(shape=(INPUT_SIZE, INPUT_SIZE, 3))
+
+    #fcn_score = fcn.output
+    fcn_score = fcn.get_layer('add_pred8_pred16_pred32').output
+
+    # Adding the crfrnn layer:
+    height, weight = INPUT_SIZE, INPUT_SIZE
+    crfrnn_output = CrfRnnLayerSPIO(image_dims=(height, weight),
+                                num_classes=nb_classes,
+                                theta_alpha=160.,
+                                theta_beta=90.,
+                                theta_gamma=3.,
+                                num_iterations=num_crf_iterations,  # 10 for test, 5 for train
+                                # bil_rate=0.5,  # add for the segmentation
+                                # theta_alpha_seg=160, #30,  # add for the segmentation
+                                name='crfrnn')([fcn_score, img_input, seg_input])
+
+    model = Model(inputs=[img_input, seg_input], outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnnSPIO')
+
+    # Fixing weighs in lower layers (optional)
+    # for layer in model.layers[:29]:  # 15,21,29 (overall 30 layers)
+    #     layer.trainable = False
+
+    return model
+
+
 def load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations):
 
     print('loading network type: %s..'% model_name)
@@ -573,34 +655,54 @@ def load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations):
     if model_name == 'fcn_VGG16_32s':
         model = fcn_VGG16_32s(INPUT_SIZE, nb_classes)
         model.crf_flag = False
+        model.sp_flag = False
 
     elif model_name == 'fcn_VGG16_32s_crfrnn':
         model = fcn_VGG16_32s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations)
         model.crf_flag = True
+        model.sp_flag = False
 
     elif model_name == 'fcn_VGG16_8s':
         model = fcn_VGG16_8s(INPUT_SIZE, nb_classes)
         model.crf_flag = False
+        model.sp_flag = False
 
     elif model_name == 'fcn_VGG16_8s_crfrnn':
         model = fcn_VGG16_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations)
         model.crf_flag = True
+        model.sp_flag = False
 
     elif model_name == 'fcn_RESNET50_32s':
         model = fcn_RESNET50_32s(INPUT_SIZE, nb_classes)
         model.crf_flag = False
+        model.sp_flag = False
 
     elif model_name == 'fcn_RESNET50_32s_crfrnn':
         model = fcn_RESNET50_32s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations)
         model.crf_flag = True
+        model.sp_flag = False
 
     elif model_name == 'fcn_RESNET50_8s':
         model = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
         model.crf_flag = False
+        model.sp_flag = False
 
     elif model_name == 'fcn_RESNET50_8s_crfrnn':
         model = fcn_RESNET50_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations)
         model.crf_flag = True
+        model.sp_flag = False
+
+    elif model_name == 'fcn_RESNET50_8s_crfrnnSP':
+        model = fcn_RESNET50_8s_crfrnnSP(INPUT_SIZE, nb_classes, num_crf_iterations)
+        model.crf_flag = True
+        model.sp_flag = True
+
+    elif model_name == 'fcn_RESNET50_8s_crfrnnSPIO':
+        model = fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE, nb_classes, num_crf_iterations)
+        model.crf_flag = True
+        model.sp_flag = True
+
+
     else:
         print('ERROR: model name does not exist..')
         return
