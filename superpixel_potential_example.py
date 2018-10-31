@@ -34,19 +34,3 @@ w_high = tf.constant(0.75)
 sp_out = tf.reduce_sum(w_low * tf.multiply(tf.to_float(T),q_vals) + w_high * tf.multiply(tf.to_float(tf.logical_not(T)),q_vals))
 
 s.run(sp_out)
-
-
-
-
-
-
-ar_max = tf.argmax(aa,dimension=0)
-bb = tf.zeros([3, 5, 3])
-
-
-
-a = tf.constant([0.3, 0.5, 0.79, 0.79, 0.11])
-
-out = tf.sparse_to_dense(tf.argmax(a),tf.cast(tf.shape(a), dtype=tf.int64), tf.reduce_max(a))
-
-cond = tf.equal(a, tf.reduce_max(a))
