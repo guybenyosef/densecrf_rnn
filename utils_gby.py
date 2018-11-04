@@ -194,7 +194,8 @@ def load_segmentations(dirpath,list_of_images,INPUT_SIZE):
         filename = line.rstrip('\n')
         #pdb.set_trace()
         #folder_array.append(getImageArr(dirpath+filename+'.jpg', INPUT_SIZE,INPUT_SIZE))
-        folder_array.append(load_image(dirpath+filename+'.jpg', INPUT_SIZE)[0, :, :])
+        segs = load_image(cv2.imread(dirpath + filename + '.jpg'), INPUT_SIZE)
+        folder_array.append(segs[0, :, :])
 
     folder_array = np.array(folder_array)
     return folder_array

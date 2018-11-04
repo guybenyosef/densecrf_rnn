@@ -61,10 +61,10 @@ def create_train_test_lists(dirname,train_list_name,test_list_name,train_rate):
 def split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args):
 
     print('training data:')
-    #[train_imgs, train_labels] = extract_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
+    [train_imgs, train_labels] = extract_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
     print('validation data:')
     [val_imgs, val_labels] = extract_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
-    train_imgs, train_labels = val_imgs, val_labels
+    #train_imgs, train_labels = val_imgs, val_labels
     #
     X_train, y_train = np.array(train_imgs)[:, 0, :, :, :], np.array(train_labels)[:, 0, :, :, :]
     X_test, y_test = np.array(val_imgs)[:, 0, :, :, :], np.array(val_labels)[:, 0, :, :, :]
