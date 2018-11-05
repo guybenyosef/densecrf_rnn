@@ -299,9 +299,9 @@ class CrfRnnLayerSPIO(Layer):
 
         # Weights of the superpixel term
         self.superpixel_ker_weights = self.add_weight(name='superpixel_ker_weights',
-                                                     shape=(2,1),   # [w_low,w_high] #  #self.num_classes, self.num_classes),
-                                                     initializer=_diagonal_initializer,
-                                                     trainable=True)
+                                                      shape=(self.num_classes, self.num_classes), # shape=(2,1),   # [w_low,w_high] #  #self.num_classes, self.num_classes),
+                                                      initializer=_diagonal_initializer,
+                                                      trainable=True)
 
         # Compatibility matrix
         self.compatibility_matrix = self.add_weight(name='compatibility_matrix',
@@ -369,7 +369,8 @@ class CrfRnnLayerSPIO(Layer):
             cond_max_label = tf.equal(q_values, tf.reduce_max(q_values, axis=0))
 
             # initiate to zeros
-            superpixel_out = tf.zeros(extended_sp_map.shape)
+            #superpixel_out = tf.zeros(extended_sp_map.shape)
+            superpixel_cond = tf.constant(False, shape=extended_sp_map.shape)
 
 
             # iterate over all superpixels
@@ -378,8 +379,15 @@ class CrfRnnLayerSPIO(Layer):
                 cond_sp_indx = tf.equal(extended_sp_map, sp_indx)
                 # This is tensor T, where the dominant label for sp_indx superpixel is:
                 T = tf.logical_and(cond_max_label, cond_sp_indx)
-                #superpixel_out += self.superpixel_ker_weights[0] * tf.multiply(tf.to_float(T), q_values) + self.superpixel_ker_weights[1] * tf.multiply(tf.to_float(tf.logical_not(T)),q_values)
-                superpixel_out += self.superpixel_ker_weights[0] * tf.to_float(T) + self.superpixel_ker_weights[1] * tf.to_float(tf.logical_not(T))
+                superpixel_cond = tf.logical_or(superpixel_cond,T)
+
+            # and now the update rule for superpixel
+            superpixel_out = tf.multiply(tf.to_float(T), q_values) # + self.superpixel_ker_weights[1] * tf.multiply(tf.to_float(tf.logical_not(T)), q_values)
+            superpixel = tf.matmul(self.superpixel_ker_weights,tf.reshape(superpixel_out, (c, -1)))
+            superpixel_update = tf.reshape(superpixel, (c, h, w))
+
+
+            #superpixel_out += self.superpixel_ker_weights[0] * tf.to_float(T) + self.superpixel_ker_weights[1] * tf.to_float(tf.logical_not(T))
             #tf.reduce_sum(superpixel_out
 
             # Weighting filter outputs
@@ -397,7 +405,7 @@ class CrfRnnLayerSPIO(Layer):
             # Adding unary potentials
             pairwise = tf.reshape(pairwise, (c, h, w))
 
-            q_values = unaries - pairwise + superpixel_out
+            q_values = unaries - pairwise + superpixel_update
             #pdb.set_trace()
             # for i in range(1):
             #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
