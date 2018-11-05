@@ -1,34 +1,77 @@
 # sp tem
 import tensorflow as tf
-
+# may come in useful: tf.verify_tensor_all_finite
 s = tf.InteractiveSession()
+nb_classes = 3
+rows, cols = 4, 5
+correct_labeling = tf.constant([[0, 0, 0, 0, 0],
+                                [0, 0, 0, 0, 0],
+                                [1, 1, 2, 2, 2],
+                                [1, 1, 2, 2, 2]])
+q_vals = tf.constant([[[0.9, 0.9, 0.9, 0.9, 0.9],
+                       [0.9, 0.9, 0.9, 0.9, 0.9],
+                       [0.01, 0.01, 0.01, 0.01, 0.01],
+                       [0.01, 0.01, 0.01, 0.01, 0.01]],
+                      [[0.01, 0.01, 0.01, 0.01, 0.01],
+                       [0.01, 0.01, 0.01, 0.01, 0.01],
+                       [0.9, 0.9, 0.8, 0.7, 0.6],
+                       [0.9, 0.9, 0.81, 0.5, 0.4]],
+                      [[0.01, 0.01, 0.01, 0.01, 0.01],
+                       [0.01, 0.01, 0.01, 0.01, 0.01],
+                       [0.4, 0.5, 0.9, 0.9, 0.9],
+                       [0.7, 0.8, 0.8, 0.9, 0.9]]])
 
 sp_map = tf.constant([[1,1,1,2,2],
                       [1,1,1,2,2],
                       [3,3,4,4,5],
                       [3,3,4,4,5]])
 
-nb_classes = 3
-
-# replicate the sp_map m times and have the shape of [rows,cols,m), where m in the number of labels
+# replicate the sp_map m times and have the shape of [rows,cols,m], where m in the number of labels
 extended_sp_map = tf.stack([sp_map] * nb_classes)
 
-q_vals = tf.random_uniform(shape=[nb_classes,4,5])
+# split sp_map into [rows, cols, #sp] so that each layer has 1 at the the indices corresponding to that sp layer
+flat = tf.reshape(sp_map, [-1])
+y, index = tf.unique(flat)
+length = s.run(tf.size(y)) # length = # of cliques
+values = [tf.cast(tf.equal(sp_map,i), tf.float32) for i in range(1,length+1)]
+split_sp_map = tf.stack(values)
+bool_sp_map = tf.stack([tf.equal(sp_map,i) for i in range(1,length+1)])
 
-# This will put True where the max prob label, False otherwise:
+#q_vals = tf.random_uniform(shape=[nb_classes,4,5])
+
+# This will put True where the max prob label, False otherwise
 cond_max_label = tf.equal(q_vals, tf.reduce_max(q_vals,axis=0))
-
-print(s.run(q_vals))
+max_label = tf.cast(cond_max_label, tf.float32)
+not_max_label = -1*tf.subtract(max_label, 1)
 
 # These would be the learned parameters:
 w_low = tf.constant(0.1)
 w_high = tf.constant(0.9)
 
-#sp_indx = 4
 sp_out = tf.zeros(q_vals.shape)
+max_q_val = tf.multiply(max_label, q_vals)
+not_max_q_val = tf.multiply(not_max_label, q_vals)
+
+for l in range(length):
+    for i in range(rows):
+        for j in range(cols):
+            # clique index is value of (i,j) in sp_map
+            clique_index = sp_map[i][j]            
+            product_matrix = tf.Variable(tf.multiply(split_sp_map[clique_index-1], q_vals[l]))
+            init_op = tf.global_variables_initializer()
+            s.run(init_op)
+            print(s.run(product_matrix))
+            tf.assign(product_matrix[i][j], 0)
+            flattened = tf.reshape(product_matrix, [-1])
+            print(s.run(flattened))
+            # Want the product of all nonzero elements in 
+            product = tf.nonzero_product(flattened)
+            sp_out[l][i][j] += w_low * product + w_high*(1-product)
+
+
+'''
 for sp_indx in range(1,6):
 
-    print(sp_indx)
     # This will put True where sp index is sp_indx, False otherwise:
     cond_sp_indx = tf.equal(extended_sp_map,sp_indx)
 
@@ -40,8 +83,9 @@ for sp_indx in range(1,6):
     sp_out += w_low * tf.to_float(T) + w_high * tf.to_float(tf.logical_not(T))
 
     # show
-    print(s.run(T))
-    print(s.run(sp_out))
+    #print(s.run(T))
+    #print(s.run(sp_out))
 
 # sp_out = tf.reduce_sum(sp_out)
 # print(s.run(sp_out))
+'''
