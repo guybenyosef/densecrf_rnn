@@ -615,7 +615,7 @@ def fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE,nb_classes,num_crf_iterations):
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
     #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
     #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
-    #saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep'
+    saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_350ep'
 
     #fcn.load_weights(saved_model_path)
 
