@@ -1,9 +1,11 @@
 # sp tem
 import tensorflow as tf
+import time
 # may come in useful: tf.verify_tensor_all_finite
 import numpy as np
 
 s = tf.InteractiveSession()
+time_in = time.time()
 nb_classes = 3
 rows, cols = 4, 5
 correct_labeling = tf.constant([[0, 0, 0, 0, 0],
@@ -71,6 +73,7 @@ for l in range(nb_classes):
         for j in range(cols):
             # clique index is value of (i,j) in sp_map
             clique_index = sp_map[i][j]
+
             product_matrix = tf.multiply(split_sp_map[clique_index-1], q_vals[l])
             val = s.run(product_matrix[i][j])
             flattened = tf.reshape(product_matrix, [-1])
@@ -85,6 +88,9 @@ for l in range(nb_classes):
             s.run(op)
 
 print(s.run(sp_out))
+
+time_out = time.time()
+print('time passed.. %s sec' % (time_out - time_in))
 
 '''
 for sp_indx in range(1,6):
