@@ -3,7 +3,7 @@
 import tensorflow as tf
 import pdb
 
-ses = tf.InteractiveSession()
+sess = tf.InteractiveSession()
 
 sp_map = tf.constant([[1,1,1,2,2],
                       [1,1,1,2,2],
@@ -35,14 +35,26 @@ w_high = tf.constant(0.9)
 #sp_indx = 4
 prod_tensor = tf.zeros(shape=q_vals.shape)
 
+cond_max_label = tf.equal(q_vals, tf.reduce_max(q_vals,axis=0))
+
 for sp_indx in range(1,6):
 
     #print(sp_indx)
     # This will put True where sp index is sp_indx, False otherwise:
     cond_sp_indx = tf.equal(extended_sp_map,sp_indx)
 
-    # put 1 in q_vqls if not belongs to sp_indx:
-    A = tf.multiply(tf.to_float(cond_sp_indx), q_vals) + tf.to_float(tf.logical_not(cond_sp_indx))
+    q_val_for_sp = tf.multiply(tf.to_float(cond_sp_indx), q_vals)
+    # put 1 in q_vqls if a pixel is not in sp_indx:
+    q_val_for_sp_padded = q_val_for_sp  + tf.to_float(tf.logical_not(cond_sp_indx))
+
+    maxlabel_q_val_for_sp = tf.reduce_max(q_val_for_sp,axis=0)
+
+    # here we put q_val[r,c,l] = q_val[r,c,l'] where l' is the dominant label (only for pixels in sp_indx)
+    maxlabel_q_val_for_sp_duplicated = tf.stack([maxlabel_q_val_for_sp] * nb_classes)
+
+    # here we compute: q_val(r,c,l) + q_val(r,c,l')   , l' is the dominant label in the clique
+    A = q_val_for_sp_padded + maxlabel_q_val_for_sp_duplicated
+    pdb.set_trace()
 
     # compute the product for each label:
     B = tf.reduce_prod(A, [1, 2])
@@ -83,6 +95,6 @@ first_term_resp_back = tf.reshape(first_term_resp, (nb_classes, rows, cols))
 
 sp_out = first_term_resp_back + w_high * (tf.ones(shape=first_term_resp_back.shape) - first_term_resp_back)
 
-print(ses.run(sp_out))
+print(sess.run(sp_out))
 
 # we then need to add sp_out to q_vals
