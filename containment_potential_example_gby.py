@@ -27,13 +27,14 @@ w_low_m = tf.constant([[0.11,0.,0.],
                        [0., 0.10, 0.],
                        [0., 0., 0.09]])
 
-w_low_m_1d = tf.constant([0.11,0.10,0.9])
+w_low_m_1d = tf.constant([0.11,0.10,0.09])
 w_low_m_1d_duplicated = tf.stack([w_low_m_1d]*(rows*cols))
 
 w_high = tf.constant(0.9)
 
 #sp_indx = 4
 prod_tensor = tf.zeros(shape=q_vals.shape)
+maxlabel_q_val = tf.zeros(shape=q_vals.shape)
 
 cond_max_label = tf.equal(q_vals, tf.reduce_max(q_vals,axis=0))
 
@@ -54,7 +55,6 @@ for sp_indx in range(1,6):
 
     # here we compute: q_val(r,c,l) + q_val(r,c,l')   , l' is the dominant label in the clique
     A = q_val_for_sp_padded + maxlabel_q_val_for_sp_duplicated
-    pdb.set_trace()
 
     # compute the product for each label:
     B = tf.reduce_prod(A, [1, 2])
@@ -66,6 +66,7 @@ for sp_indx in range(1,6):
 
     # add this to the overall product tensor; each cell contains the 'product' for its update rule:
     prod_tensor += tf.multiply(tf.to_float(cond_sp_indx), C)
+    maxlabel_q_val += maxlabel_q_val_for_sp_duplicated
 
     # This is tensor T, where the dominant label for sp_indx superpixel is:
 #    T = tf.logical_and(cond_max_label,cond_sp_indx)
@@ -79,19 +80,19 @@ for sp_indx in range(1,6):
     # show
     #print(ses.run(T))
 
-#print(ses.run(prod_tensor))
+#print(sess.run(maxlabel_q_val))
 
 # the actual product: we need to divide it by the current q_vals
-first_term = tf.divide(tf.to_float(prod_tensor),q_vals)
-#print(ses.run(first_term))
+first_term = tf.divide(tf.to_float(prod_tensor),(q_vals+maxlabel_q_val))
+#print(sess.run(first_term))
 
 # multiply by weights:  (not sure if we need w_high)
 #first_term_resp = tf.matmul(w_low_m,tf.reshape(first_term, (nb_classes,-1)))
 first_term_resp = tf.multiply(tf.transpose(w_low_m_1d_duplicated),tf.reshape(first_term, (nb_classes,-1)))
-#print(ses.run(first_term_resp))
+#print(sess.run(first_term_resp))
 
 first_term_resp_back = tf.reshape(first_term_resp, (nb_classes, rows, cols))
-#print(ses.run(first_term_resp_back))
+#print(sess.run(first_term_resp_back))
 
 sp_out = first_term_resp_back + w_high * (tf.ones(shape=first_term_resp_back.shape) - first_term_resp_back)
 
