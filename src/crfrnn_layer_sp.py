@@ -39,6 +39,8 @@ def _potts_model_initializer(shape):
 def _sp_high_weight_initializer(shape):
     return [1]
 
+def _sp_low_weight_initializer(shape):
+    return np.ones(shape, dtype=np.float32)
 
 class CrfRnnLayerSP(Layer):
     """ Implements the CRF-RNN layer described in:
@@ -202,7 +204,7 @@ class CrfRnnLayerSPIO(Layer):
 
         # Weights of the superpixel term
         self.superpixel_low_weights = self.add_weight(name='superpixel_low_weights',
-                                                     shape=(self.num_classes,self.num_classes),
+                                                      shape=(self.num_classes, self.num_classes),
                                                      initializer=_diagonal_initializer,
                                                      trainable=True)
         
@@ -234,7 +236,6 @@ class CrfRnnLayerSPIO(Layer):
         bilateral_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=True,
                                                             theta_alpha=self.theta_alpha,
                                                             theta_beta=self.theta_beta)
-
         q_values = unaries
 
         # for i in range(1):
@@ -318,7 +319,7 @@ class CrfRnnLayerSPIO(Layer):
             # Adding unary potentials
             pairwise = tf.reshape(pairwise, (c, h, w))
 
-            q_values = unaries - pairwise #- sp_out
+            q_values = unaries - pairwise - sp_out
             # for i in range(1):
             #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
 

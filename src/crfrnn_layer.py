@@ -225,7 +225,7 @@ class CrfRnnLayerSP(Layer):
 #          for i in range(1):
 #              my_tensor = tf.Print(my_tensor, [my_tensor[i]], message="q_values first 500 ", summarize=500)
 #         #pdb.set_trace()
-        superpixel_update = tf.get_variable("superpixel_update", [c, h, w], dtype=tf.float32, initializer=tf.zeros_initializer)
+        #superpixel_update = tf.get_variable("superpixel_update", [c, h, w], dtype=tf.float32, initializer=tf.zeros_initializer)
         for i in range(self.num_iterations):
             #pdb.set_trace()
             softmax_out = tf.nn.softmax(q_values, 0)
@@ -279,7 +279,7 @@ class CrfRnnLayerSP(Layer):
 
             # multiply by weights:
             #first_term_resp = tf.matmul(self.superpixel_low_weights, tf.reshape(first_term, (c, -1)))
-            superpixel_low_weights_duplicated = tf.transpose(tf.stack([self.superpixel_low_weights] * (h * w))) 
+            superpixel_low_weights_duplicated = tf.transpose(tf.stack([self.superpixel_low_weights] * (h * w)))
             first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
             first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
 
