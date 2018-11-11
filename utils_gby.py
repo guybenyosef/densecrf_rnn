@@ -192,10 +192,12 @@ def load_segmentations(dirpath,list_of_images,INPUT_SIZE):
     for indx in range(len(content)):
         line = content[indx]
         filename = line.rstrip('\n')
-        #pdb.set_trace()
-        #folder_array.append(getImageArr(dirpath+filename+'.jpg', INPUT_SIZE,INPUT_SIZE))
-        segs = load_image(cv2.imread(dirpath + filename + '.jpg'), INPUT_SIZE)
-        folder_array.append(segs[0, :, :])
+        # npy version:
+        segs = np.load(dirpath + filename + "_sp.npy")
+        folder_array.append(segs)
+        # jpg version
+        #segs = load_image(cv2.imread(dirpath + filename + '.jpg'), INPUT_SIZE)
+        #folder_array.append(segs[0, :, :])
 
     folder_array = np.array(folder_array)
     return folder_array

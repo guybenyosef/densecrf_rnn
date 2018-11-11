@@ -27,7 +27,7 @@ w_low_m = tf.constant([[0.11,0.,0.],
                        [0., 0.10, 0.],
                        [0., 0., 0.09]])
 
-w_low_m_1d = tf.constant([0.11,0.10,0.9])
+w_low_m_1d = tf.constant([0.11,0.10,0.09])
 w_low_m_1d_duplicated = tf.stack([w_low_m_1d]*(rows*cols))
 
 w_high = tf.constant(0.9)
@@ -81,7 +81,7 @@ first_term_resp = tf.multiply(tf.transpose(w_low_m_1d_duplicated),tf.reshape(fir
 first_term_resp_back = tf.reshape(first_term_resp, (nb_classes, rows, cols))
 #print(ses.run(first_term_resp_back))
 
-sp_out = first_term_resp_back + w_high * (tf.ones(shape=first_term_resp_back.shape) - first_term_resp_back)
+sp_out = first_term_resp_back + w_high * (tf.ones(shape=first_term_resp_back.shape) - first_term)
 
 print(ses.run(sp_out))
 

@@ -125,7 +125,7 @@ def horsecoarse(INPUT_SIZE,dataaug_args):
     #image_dir = "/storage/gby/datasets/horse_coarse_parts/images_orig/"
     image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
     label_dir = '/storage/gby/datasets/horse_coarse_parts/labels_orig/'
-    segments_dir = '/storage/gby/datasets/horse_coarse_parts/RAG/'
+    segments_dir = '/storage/gby/datasets/horse_coarse_parts/sp_seg/'
 
     ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
 
