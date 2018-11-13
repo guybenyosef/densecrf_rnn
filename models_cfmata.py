@@ -573,6 +573,7 @@ def fcn_RESNET50_8s_sp_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     inputs = fcn.layers[0].output
     seg_inputs = Input(shape=(INPUT_SIZE, INPUT_SIZE))
+    #TODO: Add bd_inputs = Input(shape=())
 
     fcn_score = fcn.get_layer('add_pred8_pred16_pred32').output
 
@@ -585,7 +586,7 @@ def fcn_RESNET50_8s_sp_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
                                 theta_beta=90.,
                                 theta_gamma=3.,
                                 num_iterations=num_crf_iterations,  # 10 for test, 5 for train
-                                name='crfrnn_sp')([fcn_score, inputs, seg_inputs])
+                                name='crfrnn_spio')([fcn_score, inputs, seg_inputs])
 
     model = Model(inputs=[inputs, seg_inputs], outputs=crfrnn_output, name='fcn_RESNET50_8s_sp_crfrnn')
 
