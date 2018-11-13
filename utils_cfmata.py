@@ -64,14 +64,13 @@ def load_segmentations(dataset, INPUT_SIZE, bd=False):
         folder_array.append(data)
         if bd:
             new_dict = {}
-            # TODO: convert to easily parsed format
             with open(bd_seg_path+name+"_bd.json", 'r') as f:
                 data = json.load(f)
-            for k,v in data:
-                new_dict[int(k)] = []
+            for k,v in data.items():
+                new_dict[int(k)] = [[int(s.split(',')[0][1:]), int(s.split(',')[1][:-1])] for s in v]
             folder_array_bd.append(new_dict)
     folder_array = np.array(folder_array)
-    return folder_array[:1], folder_array[1:]
+    return folder_array[:1], folder_array[1:], folder_array_bd[:1], folder_array_bd[1:]
     #return folder_array[:325], folder_array[325:]
     
 def load_mat_segmentations(dataset, INPUT_SIZE):
