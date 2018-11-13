@@ -39,6 +39,8 @@ def _potts_model_initializer(shape):
 def _sp_high_weight_initializer(shape):
     return [1]
 
+def _sp_low_weight_initializer(shape):
+    return np.ones(shape, dtype=np.float32)
 
 class CrfRnnLayerSP(Layer):
     """ Implements the CRF-RNN layer described in:
@@ -202,15 +204,14 @@ class CrfRnnLayerSPIO(Layer):
 
         # Weights of the superpixel term
         self.superpixel_low_weights = self.add_weight(name='superpixel_low_weights',
-                                                     shape=(self.num_classes,self.num_classes),
-                                                     initializer=_diagonal_initializer,
-                                                     trainable=True)
-        
+                                                      shape=(self.num_classes),
+                                                      initializer=_sp_low_weight_initializer,
+                                                      trainable=True)
+
         self.superpixel_high_weight = self.add_weight(name='superpixel_high_weight',
                                                       shape=(1),
                                                       initializer=_sp_high_weight_initializer,
                                                       trainable=True)
-
         # Compatibility matrix
         self.compatibility_matrix = self.add_weight(name='compatibility_matrix',
                                                     shape=(self.num_classes, self.num_classes),
@@ -222,11 +223,11 @@ class CrfRnnLayerSPIO(Layer):
     def call(self, inputs):
         unaries = tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1)) # the fcn_scores
         rgb = tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1)) # the raw rgb
-        superpixel_cliques = tf.transpose(inputs[2]) #perm=(0,1)
-        
+        superpixel_cliques = tf.transpose(inputs[2][0,:,:])
         # h = num_rows, w = num_cols
         c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
         all_ones = np.ones((c, h, w), dtype=np.float32)
+        y, indx = tf.unique(superpixel_cliques)
 
         # Prepare filter normalization coefficients
         spatial_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=False,
@@ -239,10 +240,9 @@ class CrfRnnLayerSPIO(Layer):
 
         # for i in range(1):
         #     my_tensor = tf.Print(my_tensor, [my_tensor[i]], message="q_values first 500 ", summarize=500)
-        sp_out = tf.get_variable("sp_out", [c, h, w], dtype=tf.float32, initializer=tf.zeros_initializer)
         for i in range(self.num_iterations):
             softmax_out = tf.nn.softmax(q_values, 0)
-            #softmax_out = tf.Print(softmax_out, [softmax_out[i]], message="softmax out", summarize=5)
+            softmax_out = tf.Print(softmax_out, [softmax_out[0]], message="softmax out", summarize=5)
             # Spatial filtering
             spatial_out = custom_module.high_dim_filter(softmax_out, rgb, bilateral=False,
                                                         theta_gamma=self.theta_gamma)
@@ -259,51 +259,38 @@ class CrfRnnLayerSPIO(Layer):
             # replicate the sp_map m times and have the shape of [rows,cols,m], where m in the number of labels
             extended_sp_map = tf.stack([sp_map] * c)
 
-            # split sp_map into [rows, cols, #sp] so that each layer has 1 at the the indices corresponding to that sp layer
-            #flat = tf.reshape(sp_map, [-1])
-            #y, index = tf.unique(flat)
-            #length = tf.get_default_session().run(tf.size(y)) # length = # of cliques
-            #values = [tf.cast(tf.equal(sp_map,i), tf.float32) for i in range(1,length+1)]
-            #split_sp_map = tf.stack(values)
-            #bool_sp_map = tf.stack([tf.equal(sp_map,i) for i in range(1,length+1)])
-
-            # This will put True where the max prob label, False otherwise
-            #cond_max_label = tf.equal(q_values, tf.reduce_max(q_values,axis=0))
-            #max_label = tf.cast(cond_max_label, tf.float32)
-            #not_max_label = -1*tf.subtract(max_label, 1)
-
-            # These would be the learned parameters:
-            #w_low = tf.constant(0.1)
-            #w_high = tf.constant(0.9)
-            
-            #max_q_val = tf.multiply(max_label, q_values)
-            #not_max_q_val = tf.multiply(not_max_label, q_values)
-            # This will put True where the max prob label, False otherwise:
-            #cond_max_label = tf.equal(q_values, tf.reduce_max(q_values,axis=0))
             prod_tensor = tf.zeros(shape=(c,h,w))
-            #Test using a small number of cliques
-            for sp_indx in range(1,5):
+            #idxs = tf.range(tf.shape(y)[0])
+            #ridxs = tf.random_shuffle(idxs)[:5]
+            #rinput = tf.gather(y, ridxs)
+            
+            for sp_indx in random.sample(range(1,400), 5):
                 # This will put True where sp index is sp_indx, False otherwise:
                 cond_sp_indx = tf.equal(extended_sp_map,sp_indx)
-                # put 1 in q_vqls if not belongs to sp_indx:
-                A = tf.tensordot(tf.to_float(cond_sp_indx), q_values, axes=1) + tf.to_float(tf.logical_not(cond_sp_indx))
+                #cond_sp_indx = tf.Print(cond_sp_indx, [cond_sp_indx], message="cond sp indx ", summarize=5)
+                # put 1 in q_vals if doesn't belong to sp_indx:
+                #q_values = tf.Print(q_values, [q_values], message="q values ", summarize=5)
+                A = tf.multiply(tf.to_float(cond_sp_indx), softmax_out) + tf.to_float(tf.logical_not(cond_sp_indx))
+                #A = tf.Print(A, [A], message="A ", summarize=5)
                 # compute the product for each label:
                 B = tf.reduce_prod(A, [1, 2])
+                #B = tf.Print(B, [B], message="B ", summarize=5)
                 # Create a tensor where each cell contains the product for its superpiel sp_indx and its label l:
                 C = tf.stack([B]*(h*w))
                 C = tf.reshape(tf.transpose(C), (c, h, w))
-                C = tf.tensordot(tf.to_float(cond_sp_indx), C, axes=1)
-                
+                C = tf.multiply(tf.to_float(cond_sp_indx), C)
+                #C = tf.Print(C, [C], message="C ", summarize=5)
                 # add this to the overall product tensor; each cell contains the 'product' for its update rule:
-                #prod_tensor += tf.multiply(tf.to_float(cond_sp_indx), C)
                 prod_tensor += C
 
             # the actual product: we need to divide it by the current q_vals
             first_term = tf.divide(tf.to_float(prod_tensor),q_values)
-            first_term_resp = tf.matmul(self.superpixel_low_weights,tf.reshape(first_term, (c,-1)))
+            superpixel_low_weights_duplicated = tf.transpose(tf.stack([self.superpixel_low_weights] * (h * w)))
+            first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
             first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-            sp_out =  first_term_resp_back + self.superpixel_high_weight * (tf.ones(shape=(c,h,w)) - first_term)
+            superpixel_update = first_term_resp_back + self.superpixel_high_weight * (tf.ones(shape=(c,h,w)) - first_term)
 
+            superpixel_update = tf.Print(superpixel_update, [superpixel_update[0]], message="sp first 5 ", summarize=5)
 
             # Weighting filter outputs
             message_passing = (tf.matmul(self.spatial_ker_weights,
@@ -318,9 +305,9 @@ class CrfRnnLayerSPIO(Layer):
             # Adding unary potentials
             pairwise = tf.reshape(pairwise, (c, h, w))
 
-            q_values = unaries - pairwise #- sp_out
-            # for i in range(1):
-            #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
+            q_values = unaries - pairwise - superpixel_update
+            #for i in range(1):
+            #    q_values = tf.Print(q_values, [q_values[i]], message="q_values first 5 ", summarize=5)
 
         return tf.transpose(tf.reshape(q_values, (1, c, h, w)), perm=(0, 2, 3, 1))
 

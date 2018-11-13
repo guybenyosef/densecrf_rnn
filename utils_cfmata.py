@@ -20,6 +20,7 @@ import seaborn as sns
 sns.set_style("whitegrid", {'axes.grid' : False})
 from os import listdir
 from os.path import isfile, join
+import json
 
 # ------------------
 # Generate segmentations:
@@ -47,9 +48,10 @@ def load_RAG_segmentations(dataset, INPUT_SIZE):
     folder_array = np.array(folder_array)
     return folder_array[:325], folder_array[325:]
 
-def load_segmentations(dataset, INPUT_SIZE):
-    img_names, folder_array = [], []
+def load_segmentations(dataset, INPUT_SIZE, bd=False):
+    img_names, folder_array, folder_array_bd = [], [], []
     sp_seg_path = 'data/horse_coarse_parts/sp_seg/'
+    bd_seg_path = 'data/horse_coarse_parts/bd_seg/'
     if dataset == 'horsecoarse':
         with open('lst/'+dataset+'_train.txt', 'r') as f:
             img_names.extend([line.strip() for line in f])
@@ -58,9 +60,19 @@ def load_segmentations(dataset, INPUT_SIZE):
     for name in img_names:
         name = img_names[0]
         data = np.load(sp_seg_path+name + "_sp.npy")
+        data = np.resize(data, [INPUT_SIZE, INPUT_SIZE])
         folder_array.append(data)
+        if bd:
+            new_dict = {}
+            # TODO: convert to easily parsed format
+            with open(bd_seg_path+name+"_bd.json", 'r') as f:
+                data = json.load(f)
+            for k,v in data:
+                new_dict[int(k)] = []
+            folder_array_bd.append(new_dict)
     folder_array = np.array(folder_array)
-    return folder_array[:325], folder_array[325:]
+    return folder_array[:1], folder_array[1:]
+    #return folder_array[:325], folder_array[325:]
     
 def load_mat_segmentations(dataset, INPUT_SIZE):
     img_names, folder_array = [], []
