@@ -212,6 +212,7 @@ class CrfRnnLayerSPIO(Layer):
                                                       shape=(1),
                                                       initializer=_sp_high_weight_initializer,
                                                       trainable=True)
+        '''
         # Weights of the containment term
         self.containment_low_weights = self.add_weight(name='containment_low_weights',
                                                       shape=(self.num_classes),
@@ -222,6 +223,7 @@ class CrfRnnLayerSPIO(Layer):
                                                       shape=(1),
                                                       initializer=_sp_high_weight_initializer,
                                                       trainable=True)
+        '''
         # Compatibility matrix
         self.compatibility_matrix = self.add_weight(name='compatibility_matrix',
                                                     shape=(self.num_classes, self.num_classes),
@@ -271,26 +273,39 @@ class CrfRnnLayerSPIO(Layer):
             for sp_indx in random.sample(range(1,400), 1):
                 # This will put True where sp index is sp_indx, False otherwise:
                 cond_sp_indx = tf.equal(extended_sp_map,sp_indx)
+                cond_sp_indx = tf.Print(cond_sp_indx, [cond_sp_indx[0]], message="cond_sp_indx first 5 ", summarize=5)
                 # put 1 in q_vals if doesn't belong to sp_indx:
-                A = tf.multiply(tf.to_float(cond_sp_indx), softmax_out) + tf.to_float(tf.logical_not(cond_sp_indx))
+                A = tf.multiply(tf.to_float(cond_sp_indx), q_values) + tf.to_float(tf.logical_not(cond_sp_indx))
+                A = tf.Print(A, [A[0]], message="A first 5 ", summarize=5)
                 # compute the product for each label:
-                B = tf.reduce_prod(A, [1, 2])
+                #B = tf.reduce_prod(A, [1, 2])
+                B = tf.reduce_sum(A, [1,2])
+                B = tf.Print(B, [B[0]], message="B first 5 ", summarize=5)
                 # Create a tensor where each cell contains the product for its superpiel sp_indx and its label l:
                 C = tf.stack([B]*(h*w))
+                C = tf.Print(C, [C[0]], message="C first 5 ", summarize=5)
                 C = tf.reshape(tf.transpose(C), (c, h, w))
+                C = tf.Print(C, [C[0]], message="C first 5 ", summarize=5)
                 C = tf.multiply(tf.to_float(cond_sp_indx), C)
+                C = tf.Print(C, [C[0]], message="C first 5 ", summarize=5)
                 # add this to the overall product tensor; each cell contains the 'product' for its update rule:
                 prod_tensor += C
 
             # the actual product: we need to divide it by the current q_vals
-            first_term = tf.divide(tf.to_float(prod_tensor),softmax_out)
+            #first_term = tf.divide(tf.to_float(prod_tensor),softmax_out)
+            first_term = tf.subtract(tf.to_float(prod_tensor), q_values)
+            first_term = tf.Print(first_term, [first_term[0]], message="first term first 5 ", summarize=5)
             superpixel_low_weights_duplicated = tf.transpose(tf.stack([self.superpixel_low_weights] * (h * w)))
+            
             first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+            first_term_resp = tf.Print(first_term_resp, [first_term_resp[0]], message="resp first 5 ", summarize=5)
             first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
+            first_term_resp_back = tf.Print(first_term_resp_back, [first_term_resp_back[0]], message="back first 5 ", summarize=5)
             superpixel_update = first_term_resp_back + self.superpixel_high_weight * (tf.ones(shape=(c,h,w)) - first_term)
+            superpixel_update = tf.nn.softmax(superpixel_update, 0)
+            superpixel_update = tf.Print(superpixel_update, [superpixel_update[0]], message="sp first 5 ", summarize=5)
 
-            #superpixel_update = tf.Print(superpixel_update, [superpixel_update[0]], message="sp first 5 ", summarize=5)
-
+            '''
             # Containment Update
             bd_map = superpixel_cliques
             extended_bd_map = tf.stack([bd_map]*c)
@@ -330,8 +345,8 @@ class CrfRnnLayerSPIO(Layer):
             first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
             containment_update = first_term_resp_back + self.containment_high_weight * (tf.ones(shape=(c,h,w)) - first_term)
 
-            #containment_update = tf.Print(containment_update, [containment_update[0]], message="ct update ", summarize=5)
-            
+            containment_update = tf.Print(containment_update, [containment_update[0]], message="ct update ", summarize=5)
+            '''
             # Weighting filter outputs
             message_passing = (tf.matmul(self.spatial_ker_weights,
                                          tf.reshape(spatial_out, (c, -1))) +
@@ -345,7 +360,7 @@ class CrfRnnLayerSPIO(Layer):
             # Adding unary potentials
             pairwise = tf.reshape(pairwise, (c, h, w))
 
-            q_values = unaries - pairwise - superpixel_update - containment_update
+            q_values = unaries - pairwise - superpixel_update #- containment_update
             #for i in range(1):
             #    q_values = tf.Print(q_values, [q_values[i]], message="q_values first 5 ", summarize=5)
 
