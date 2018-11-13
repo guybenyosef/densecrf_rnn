@@ -66,7 +66,7 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     config = tf.ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = 0.70 # default: "0.95"
-    config.gpu_options.visible_device_list = "0" # default: "2"
+    config.gpu_options.visible_device_list = "1" # default: "2"
     set_session(tf.Session(config=config))
 
     # ===============
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     seg_train, seg_test = [], []
     if args.superpixel == 1:
         #seg_train, seg_test = load_RAG_segmentations(args.dataset, INPUT_SIZE)
-        seg_train, seg_test = load_segmentations(args.dataset, INPUT_SIZE)
+        seg_train, seg_test, bd_train, bd_test = load_segmentations(args.dataset, INPUT_SIZE, bd=True)
     print(seg_train.shape, seg_test.shape)
     
     ds = load_dataset(args.dataset,INPUT_SIZE)
@@ -133,14 +133,14 @@ if __name__ == '__main__':
     checkpoint = ModelCheckpoint(RES_DIR+"horse_coarse_weights_sp.{epoch:02d}-{val_loss:.2f}", save_weights_only=True,verbose=1, period=1000)
     cb_list = [checkpoint]
     
-    hist1 = model.fit([ds.X_train, seg_train], ds.y_train,
-                      validation_data=([ds.X_test, seg_test], ds.y_test),
+    hist1 = model.fit([ds.X_train, seg_train], ds.y_train, # [ds.X_train, seg_train, bd_train]
+                      validation_data=([ds.X_test, seg_test], ds.y_test), # [ds.X_test, seg_test, bd_test]
                       batch_size=batch_size, epochs=num_epochs, callbacks = cb_list, verbose=verbose_mode)
 
     # ===============
     # SAVE model:
     # ===============
-    model.save_weights(RES_DIR + args.dataset + '_weights_sp' + model.name + '_' + str(num_epochs) + 'ep')
+    model.save_weights(RES_DIR + args.dataset + '_weights_spio' + model.name + '_' + str(num_epochs) + 'ep')
 
     # ===============
     # ANALYZE model:
