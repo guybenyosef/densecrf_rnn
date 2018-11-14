@@ -34,7 +34,6 @@ import pdb
 def _diagonal_initializer(shape):
     return np.eye(shape[0], shape[1], dtype=np.float32)
 
-
 def _potts_model_initializer(shape):
     return -1 * _diagonal_initializer(shape)
 
@@ -56,19 +55,19 @@ def _compute_superpixel_update(q_values,superpixel_low_weights,superpixel_high_w
     # initiate to zeros
     prod_tensor = tf.zeros(shape=(c, h, w))
 
-    # iterate over all superpixels
-    for sp_indx in random.sample(range(1, 256), 5):  # sampling superpixels, otherwise memory is overloaded
+    # iterate over all superpixels, # Sample the center of the image
+    for sp_indx in random.sample(range(200, 400), 5):  # sampling superpixels, otherwise memory is overloaded
         # print(sp_indx)
         # This will put True where where sp index is sp_indx, False otherwise:
         cond_sp_indx = tf.equal(extended_sp_map, sp_indx)
 
         # put 1 in q_vqls if not belongs to sp_indx:  ## (using tf.tensordot rather than tf.multiply)
         #q_val_for_sp_padded = tf.multiply(tf.to_float(cond_sp_indx), q_values) + tf.to_float(tf.logical_not(cond_sp_indx))
-        q_val_for_sp = tf.multiply(tf.to_float(cond_sp_indx), tf.log(q_values))
+        q_val_for_sp = tf.multiply(tf.to_float(cond_sp_indx), q_values)
 
         # compute the product for each label:
         #B = tf.reduce_prod(q_val_for_sp_padded, [1, 2])
-        B = tf.exp(tf.reduce_sum(q_val_for_sp, [1,2]))
+        B = tf.reduce_logsumexp(q_val_for_sp, [1, 2])
 
         # Create a tensor where each cell contains the product for its superpiel sp_indx and its label l:
         C = tf.stack([B] * (h * w))
@@ -80,7 +79,11 @@ def _compute_superpixel_update(q_values,superpixel_low_weights,superpixel_high_w
 
     # and now the update rule for superpixel
     # the actual product: we need to divide it by the current q_vals
-    first_term = tf.divide(tf.to_float(prod_tensor), q_values)
+    #first_term = tf.divide(tf.to_float(prod_tensor), q_values)
+    bool_sum_zero = tf.equal(q_values, 0)
+    bool_sum_one = tf.to_float(bool_sum_zero)
+    q_values_modified = q_values + bool_sum_one
+    first_term = tf.divide(tf.to_float(prod_tensor), q_values_modified)
 
     # multiply by weights:
     # first_term_resp = tf.matmul(self.superpixel_low_weights, tf.reshape(first_term, (c, -1)))
@@ -102,7 +105,7 @@ def _compute_containment_update(q_values,containment_low_weights,containment_hig
 
     q_val_sum_tensor = tf.zeros(shape=(c,h,w))
 
-    for sp_indx in random.sample(range(1,256), 5):
+    for sp_indx in random.sample(range(200,400), 5):
 
         # This will put True where bd index is clique_indx, False otherwise:
         bool_bd_indx = tf.equal(extended_bd_map,sp_indx)
@@ -122,29 +125,85 @@ def _compute_containment_update(q_values,containment_low_weights,containment_hig
         # Subtract q_val(r,c,l') from indices where l = l'
         l_prime_equals_l = tf.multiply(tf.to_float(tf.logical_and(bool_max_label, bool_bd_indx)), q_values)
         A = tf.subtract(A, l_prime_equals_l)
-        #A_no_padding = tf.subtract(A_no_padding, l_prime_equals_l)
-        q_val_sum_tensor+= A #A_no_padding
+        A_no_padding = tf.subtract(A_no_padding, l_prime_equals_l)
+
+        q_val_sum_tensor+= A_no_padding  # A
 
         # compute the product for each label:
-        B = tf.reduce_prod(A, [1, 2])
+        #B = tf.reduce_prod(A, [1, 2]) # less stable
+        B = tf.reduce_logsumexp(A_no_padding, [1, 2])  # more stable
 
         # Create a tensor where each cell contains the product for its boundary clique_indx and its label l:
-        C = tf.stack([B]*(h*w))
+        C = tf.stack([B] * (h * w))
         C = tf.reshape(tf.transpose(C), (c, h, w))
         C = tf.multiply(tf.to_float(bool_bd_indx), C)
 
         # add this to the overall product tensor; each cell contains the 'product' for its update rule:
         prod_tensor_io += tf.multiply(tf.to_float(bool_bd_indx), C)
 
+    # Add 1 to q_val_sum_tensor where it is 0
+    bool_sum_zero = tf.equal(q_val_sum_tensor, 0)
+    bool_sum_one = tf.to_float(bool_sum_zero)
+    q_val_sum_tensor += bool_sum_one
+
     # the actual product: we need to divide it by each index's q_val(r,c,l) + q_val(r,c,l')
-    first_term = tf.divide(tf.to_float(prod_tensor_io),q_val_sum_tensor)
-    containment_low_weights_duplicated = tf.transpose(tf.stack([containment_low_weights]*(h*w)))
-    first_term_resp = tf.multiply(containment_low_weights_duplicated,tf.reshape(first_term, (c,-1)))
+    first_term = tf.divide(tf.to_float(prod_tensor_io), q_val_sum_tensor)
+    containment_low_weights_duplicated = tf.transpose(tf.stack([containment_low_weights] * (h * w)))
+    first_term_resp = tf.multiply(containment_low_weights_duplicated, tf.reshape(first_term, (c,-1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
     containment_update = first_term_resp_back + containment_high_weights * (tf.ones(shape=(c,h,w)) - first_term)
 
     return containment_update
 
+def _compute_attachment_update(q_values,attachment_low_weights,attachment_high_weights,sp_map,c, h, w ):
+
+    prod_tensor_att = tf.zeros(shape=(c, h, w))
+
+    extended_att_map = tf.stack([sp_map] * c)
+
+    for l1 in random.sample(range(200, 400), 5):
+        # Get locations of first sp in clique
+        bool_sp_indx1 = tf.equal(extended_att_map, l1)
+
+        #for l2 in random.sample(range(200, 400), 5):
+        l2 = l1 + 1
+
+        bool_sp_indx2 = tf.equal(extended_att_map, l2)
+
+        # Don't put 1 in q_values anymore if doesn't belong to this clique
+        A1 = tf.multiply(tf.to_float(bool_sp_indx1), q_values)  # + tf.to_float(tf.logical_not(bool_sp_indx1))
+        A2 = tf.multiply(tf.to_float(bool_sp_indx2), q_values)  # + tf.to_float(tf.logical_not(bool_sp_indx2))
+
+        # Compute product for each cell:
+        # B1 = tf.reduce_prod(A1, [1,2])  # less stable
+        # B2 = tf.reduce_prod(A2, [1,2])  # less stable
+        B1 = tf.reduce_logsumexp(A1, [1, 2])
+        B2 = tf.reduce_logsumexp(A2, [1, 2])
+
+        # Create tensor containing products for each cell
+        C1 = tf.stack([B1] * (h * w))
+        C1 = tf.reshape(tf.transpose(C1), (c, h, w))
+        C1 = tf.multiply(tf.to_float(bool_sp_indx1), C1)
+        #
+        C2 = tf.stack([B2] * (h * w))
+        C2 = tf.reshape(tf.transpose(C2), (c, h, w))
+        C2 = tf.multiply(tf.to_float(bool_sp_indx2), C2)
+
+        # Add to overall product
+        prod_tensor_att += C1 + C2
+
+    # Avoid division by zero from q_values
+    bool_sum_zero = tf.equal(q_values, 0)
+    bool_sum_one = tf.to_float(bool_sum_zero)
+    q_values_modified = q_values + bool_sum_one
+
+    first_term = tf.divide(tf.to_float(prod_tensor_att), q_values_modified)
+    att_low_weights_duplicated = tf.transpose(tf.stack([attachment_low_weights] * (h * w)))
+    first_term_resp = tf.multiply(att_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+    first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
+    attachment_update = first_term_resp_back + attachment_high_weights * (tf.ones(shape=(c, h, w)) - first_term)
+
+    return attachment_update
 
 class CrfRnnLayer(Layer):
     """ Implements the CRF-RNN layer described in:
@@ -327,7 +386,7 @@ class CrfRnnLayerSP(Layer):
         for i in range(self.num_iterations):
             #pdb.set_trace()
             softmax_out = tf.nn.softmax(q_values, 0)
-            softmax_out = tf.Print(softmax_out, [softmax_out[0]], message="softmax out", summarize=5)
+            #softmax_out = tf.Print(softmax_out, [softmax_out[0]], message="softmax out", summarize=5)
 
             # Spatial filtering
             spatial_out = custom_module.high_dim_filter(softmax_out, rgb, bilateral=False,
@@ -477,19 +536,17 @@ class CrfRnnLayerSPIO(Layer):
             bilateral_out = bilateral_out / bilateral_norm_vals
 
             # compute superpixel potential update:
-            superpixel_update = _compute_superpixel_update(q_values, self.superpixel_low_weights, self.superpixel_high_weight, superpixel_cliques, c, h, w)
+            superpixel_update = _compute_superpixel_update(softmax_out, self.superpixel_low_weights, self.superpixel_high_weight, superpixel_cliques, c, h, w)
 
             # compute containment potential update:
             # bd_maps = superpixel_cliques
-            containment_update = _compute_containment_update(q_values, self.containment_low_weights, self.containment_high_weight, superpixel_cliques, c, h, w)
+            containment_update = _compute_containment_update(softmax_out, self.containment_low_weights, self.containment_high_weight, superpixel_cliques, c, h, w)
 
             # Weighting filter outputs
             message_passing = (tf.matmul(self.spatial_ker_weights,
                                          tf.reshape(spatial_out, (c, -1))) +
                                tf.matmul(self.bilateral_ker_weights,
                                          tf.reshape(bilateral_out, (c, -1)))
-            #                   tf.matmul(self.sp_ker_weights
-            #                             tf.reshape(superpixel_out, (c, -1)))
                                )
 
             # Compatibility transform
@@ -509,6 +566,158 @@ class CrfRnnLayerSPIO(Layer):
     def compute_output_shape(self, input_shape):
         return input_shape
 
+
+
+class CrfRnnLayerSPIOAT(Layer):
+    """ Implements the CRF-RNN layer described in:
+
+    Conditional Random Fields as Recurrent Neural Networks,
+    S. Zheng, S. Jayasumana, B. Romera-Paredes, V. Vineet, Z. Su, D. Du, C. Huang and P. Torr,
+    ICCV 2015
+    """
+
+    def __init__(self, image_dims, num_classes,
+                 theta_alpha, theta_beta, theta_gamma,
+                 num_iterations, **kwargs):
+        self.image_dims = image_dims
+        self.num_classes = num_classes
+        self.theta_alpha = theta_alpha
+        self.theta_beta = theta_beta
+        self.theta_gamma = theta_gamma
+        self.num_iterations = num_iterations
+        self.spatial_ker_weights = None
+        self.bilateral_ker_weights = None
+        self.compatibility_matrix = None
+        super(CrfRnnLayerSPIOAT, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        # Weights of the spatial kernel
+        self.spatial_ker_weights = self.add_weight(name='spatial_ker_weights',
+                                                   shape=(self.num_classes, self.num_classes),
+                                                   initializer=_diagonal_initializer,
+                                                   trainable=True)
+
+        # Weights of the bilateral kernel
+        self.bilateral_ker_weights = self.add_weight(name='bilateral_ker_weights',
+                                                     shape=(self.num_classes, self.num_classes),
+                                                     initializer=_diagonal_initializer,
+                                                     trainable=True)
+
+        # Weights of the superpixel term
+        self.superpixel_low_weights = self.add_weight(name='superpixel_low_weights',
+                                                      shape=(self.num_classes),
+                                                      initializer=_sp_low_weight_initializer,
+                                                      trainable=True)
+
+        self.superpixel_high_weight = self.add_weight(name='superpixel_high_weight',
+                                                      shape=(1),
+                                                      initializer=_sp_high_weight_initializer,
+                                                      trainable=True)
+
+        # Weights of the containment term
+        self.containment_low_weights = self.add_weight(name='containment_low_weights',
+                                                       shape=(self.num_classes),
+                                                       initializer=_sp_low_weight_initializer,
+                                                       trainable=True)
+
+        self.containment_high_weight = self.add_weight(name='containment_high_weight',
+                                                       shape=(1),
+                                                       initializer=_sp_high_weight_initializer,
+                                                       trainable=True)
+
+        # Weights of the attachment term
+        self.attachment_low_weights = self.add_weight(name='attachment_low_weights',
+                                                       shape=(self.num_classes),
+                                                       initializer=_sp_low_weight_initializer,
+                                                       trainable=True)
+
+        self.attachment_high_weight = self.add_weight(name='attachment_high_weight',
+                                                       shape=(1),
+                                                       initializer=_sp_high_weight_initializer,
+                                                       trainable=True)
+
+        # Compatibility matrix
+        self.compatibility_matrix = self.add_weight(name='compatibility_matrix',
+                                                    shape=(self.num_classes, self.num_classes),
+                                                    initializer=_potts_model_initializer,
+                                                    trainable=True)
+
+        super(CrfRnnLayerSPIOAT, self).build(input_shape)
+
+    def call(self, inputs):
+
+        unaries = tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1)) # the fcn_scores
+        rgb = tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1)) # the raw rgb
+        #segs = [tf.transpose(inputs[i][0, :, :, :], perm=(2, 0, 1)) for i in range(2, len(inputs))]
+        superpixel_cliques = tf.transpose(inputs[2][0,:,:])  # perm=(0,1)
+
+        c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
+
+        all_ones = np.ones((c, h, w), dtype=np.float32)
+
+        # Prepare filter normalization coefficients
+        spatial_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=False,
+                                                          theta_gamma=self.theta_gamma)
+        bilateral_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=True,
+                                                            theta_alpha=self.theta_alpha,
+                                                            theta_beta=self.theta_beta)
+        q_values = unaries
+
+#        pdb.set_trace()
+#         my_tensor = q_values
+#          for i in range(1):
+#              my_tensor = tf.Print(my_tensor, [my_tensor[i]], message="q_values first 500 ", summarize=500)
+#         #pdb.set_trace()
+        #superpixel_update = tf.get_variable("superpixel_update", [c, h, w], dtype=tf.float32, initializer=tf.zeros_initializer)
+        for i in range(self.num_iterations):
+            #pdb.set_trace()
+            softmax_out = tf.nn.softmax(q_values, 0)
+            #softmax_out = tf.Print(softmax_out, [softmax_out[0]], message="softmax out", summarize=5)
+
+            # Spatial filtering
+            spatial_out = custom_module.high_dim_filter(softmax_out, rgb, bilateral=False,
+                                                        theta_gamma=self.theta_gamma)
+            spatial_out = spatial_out / spatial_norm_vals
+
+            # Bilateral filtering
+            bilateral_out = custom_module.high_dim_filter(softmax_out, rgb, bilateral=True,
+                                                          theta_alpha=self.theta_alpha,
+                                                          theta_beta=self.theta_beta)
+            bilateral_out = bilateral_out / bilateral_norm_vals
+
+            # compute superpixel potential update:
+            superpixel_update = _compute_superpixel_update(softmax_out, self.superpixel_low_weights, self.superpixel_high_weight, superpixel_cliques, c, h, w)
+
+            # compute containment potential update:
+            containment_update = _compute_containment_update(softmax_out, self.containment_low_weights, self.containment_high_weight, superpixel_cliques, c, h, w)
+
+            # compute attachment potential update:
+            attachment_update = _compute_attachment_update(softmax_out, self.attachment_low_weights, self.attachment_high_weight, superpixel_cliques, c, h, w)
+
+
+            # Weighting filter outputs
+            message_passing = (tf.matmul(self.spatial_ker_weights,
+                                         tf.reshape(spatial_out, (c, -1))) +
+                               tf.matmul(self.bilateral_ker_weights,
+                                         tf.reshape(bilateral_out, (c, -1)))
+                               )
+
+            # Compatibility transform
+            pairwise = tf.matmul(self.compatibility_matrix, message_passing)
+
+            # Adding unary potentials
+            pairwise = tf.reshape(pairwise, (c, h, w))
+
+            q_values = unaries - pairwise - superpixel_update - containment_update - attachment_update
+            #pdb.set_trace()
+            # for i in range(1):
+            #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
+            #pdb.set_trace()
+
+        return tf.transpose(tf.reshape(q_values, (1, c, h, w)), perm=(0, 2, 3, 1))
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
 
 
 # class CrfRnnLayerSPIO(Layer):
