@@ -225,6 +225,18 @@ class CrfRnnLayerSPIO(Layer):
                                                       initializer=_sp_high_weight_initializer,
                                                       trainable=True)
         #'''
+        #'''
+        # Weights of the attachment term
+        self.attachment_low_weights = self.add_weight(name='attachment_low_weights',
+                                                      shape=(self.num_classes),
+                                                      initializer=_sp_low_weight_initializer,
+                                                      trainable=True)
+
+        self.attachment_high_weight = self.add_weight(name='attachment_high_weight',
+                                                      shape=(1),
+                                                      initializer=_sp_high_weight_initializer,
+                                                      trainable=True)
+        #'''
         # Compatibility matrix
         self.compatibility_matrix = self.add_weight(name='compatibility_matrix',
                                                     shape=(self.num_classes, self.num_classes),
@@ -379,6 +391,44 @@ class CrfRnnLayerSPIO(Layer):
 
             #containment_update = tf.Print(containment_update, [containment_update[0]], message="ct update ", summarize=5)
             #'''
+
+            # Compute attachment update
+            prod_tensor_att = tf.zeros(shape=(c,h,w))
+            extended_att_map = tf.stack([sp_map]*c)
+            for l1 in random.sample(range(200,400), 1):
+                # Get locations of first sp in clique
+                bool_sp_indx1 = tf.equal(extended_att_map,l1)
+                for l2 in random.sample(range(200,400), 1):
+                    bool_sp_indx2 = tf.equal(extended_att_map, l2)
+                    # Don't put 1 in q_values anymore if doesn't belong to this clique
+                    A1 = tf.multiply(tf.to_float(bool_sp_indx1), softmax_out) #+ tf.to_float(tf.logical_not(bool_sp_indx1))
+                    A2 = tf.multiply(tf.to_float(bool_sp_indx2), softmax_out) #+ tf.to_float(tf.logical_not(bool_sp_indx2))
+                    # Compute product for each cell:
+                    #B1 = tf.reduce_prod(A1, [1,2])
+                    #B2 = tf.reduce_prod(A2, [1,2])
+                    B1 = tf.reduce_logsumexp(A1, [1,2])
+                    B2 = tf.reduce_logsumexp(A2, [1,2])
+                    # Create tensor containing products for each cell
+                    C1 = tf.stack([B1]*(h*w))
+                    C1 = tf.reshape(tf.transpose(C1), (c,h,w))
+                    C1 = tf.multiply(tf.to_float(bool_sp_indx1), C1)
+                    C2 = tf.stack([B2]*(h*w))
+                    C2 = tf.reshape(tf.transpose(C2), (c,h,w))
+                    C2 = tf.multiply(tf.to_float(bool_sp_indx2), C2)
+                    # Add to overall product
+                    prod_tensor_att += C1 + C2
+
+            # Avoid division by zero from softmax_out
+            bool_sum_zero = tf.equal(softmax_out, 0)
+            bool_sum_one = tf.to_float(bool_sum_zero)
+            softmax_out_mod = softmax_out + bool_sum_one
+            first_term = tf.divide(tf.to_float(prod_tensor_att),softmax_out_mod)
+            att_low_weights_duplicated = tf.transpose(tf.stack([self.attachment_low_weights]*(h*w)))
+            first_term_resp = tf.multiply(att_low_weights_duplicated,tf.reshape(first_term, (c,-1)))
+            first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
+            attachment_update =  first_term_resp_back + self.attachment_high_weight * (tf.ones(shape=(c,h,w)) - first_term)
+            #attachment_update = tf.Print(attachment_update, [attachment_update[0]], message="att out ", summarize=5)
+            
             # Weighting filter outputs
             message_passing = (tf.matmul(self.spatial_ker_weights,
                                          tf.reshape(spatial_out, (c, -1))) +
@@ -392,7 +442,7 @@ class CrfRnnLayerSPIO(Layer):
             # Adding unary potentials
             pairwise = tf.reshape(pairwise, (c, h, w))
 
-            q_values = unaries - pairwise - superpixel_update - containment_update
+            q_values = unaries - pairwise - superpixel_update - containment_update - attachment_update
             #for i in range(1):
             #    q_values = tf.Print(q_values, [q_values[i]], message="q_values first 5 ", summarize=5)
 
