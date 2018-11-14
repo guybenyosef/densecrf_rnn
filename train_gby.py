@@ -164,16 +164,22 @@ if __name__ == '__main__':
 
 
     #pdb.set_trace()
-    # option 1:
-    hist1 = model.fit(ds.X_train, ds.y_train,
-                      validation_data=(ds.X_test, ds.y_test),
-                      batch_size=batch_size, epochs=num_epochs, verbose=verbose_mode)
-    # option 2: use data generator for data augmentation
-    # hist1 = model.fit_generator(generator=ds.datagen_train,
-    #                   validation_data=(ds.X_test, ds.y_test),
-    #                   steps_per_epoch=args.stepsepoch,
-    #                   use_multiprocessing=True,
-    #                   epochs=num_epochs, verbose=verbose_mode)
+    data_augmentation_flag = True # False #
+
+    if not data_augmentation_flag:
+        # option 1:
+        print("NOT using data augmentation..")
+        hist1 = model.fit(ds.X_train, ds.y_train,
+                          validation_data=(ds.X_test, ds.y_test),
+                          batch_size=batch_size, epochs=num_epochs, verbose=verbose_mode)
+    else:
+        # option 2: use data generator for data augmentation
+        print("using data augmentation..")
+        hist1 = model.fit_generator(generator=ds.datagen_train,
+                          validation_data=(ds.X_test, ds.y_test),
+                          steps_per_epoch=args.stepsepoch,
+                          use_multiprocessing=True,
+                          epochs=num_epochs, verbose=verbose_mode)
 
 
     # ===============
