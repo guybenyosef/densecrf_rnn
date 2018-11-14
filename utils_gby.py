@@ -195,7 +195,8 @@ def load_segmentations(dirpath,list_of_images,INPUT_SIZE):
         # npy version:
         segs = np.load(dirpath + filename + "_sp.npy")
         #cv2.resize(segs, dsize=(INPUT_SIZE, INPUT_SIZE), interpolation=cv2.INTER_CUBIC)
-        segs = np.resize(segs, [INPUT_SIZE, INPUT_SIZE])
+        if INPUT_SIZE!=512:
+            segs = np.resize(segs, [INPUT_SIZE, INPUT_SIZE])
         folder_array.append(segs)
         # jpg version
         #segs = load_image(cv2.imread(dirpath + filename + '.jpg'), INPUT_SIZE)

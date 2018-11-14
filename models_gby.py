@@ -8,8 +8,7 @@ from keras.applications.resnet50 import ResNet50
 from utils_gby import bilinear_upsample_weights
 import sys
 sys.path.insert(1, './src')
-from crfrnn_layer import CrfRnnLayer,CrfRnnLayerSP
-from crfrnn_layer_sp import CrfRnnLayerSPIO
+from crfrnn_layer import CrfRnnLayer, CrfRnnLayerSP, CrfRnnLayerSPIO
 
 # -----------------------
 # Model design
@@ -621,7 +620,7 @@ def fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE,nb_classes,num_crf_iterations):
     # two inputs:
     img_input = fcn.layers[0].output
     #seg_input = fcn.layers[0].output
-    seg_input = Input(shape=(INPUT_SIZE, INPUT_SIZE, 3))
+    seg_input = Input(shape=(INPUT_SIZE, INPUT_SIZE))
 
     #fcn_score = fcn.output
     fcn_score = fcn.get_layer('add_pred8_pred16_pred32').output
@@ -634,8 +633,6 @@ def fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE,nb_classes,num_crf_iterations):
                                 theta_beta=90.,
                                 theta_gamma=3.,
                                 num_iterations=num_crf_iterations,  # 10 for test, 5 for train
-                                # bil_rate=0.5,  # add for the segmentation
-                                # theta_alpha_seg=160, #30,  # add for the segmentation
                                 name='crfrnn')([fcn_score, img_input, seg_input])
 
     model = Model(inputs=[img_input, seg_input], outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnnSPIO')
