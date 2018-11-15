@@ -8,7 +8,8 @@ from keras.applications.resnet50 import ResNet50
 from utils_gby import bilinear_upsample_weights
 import sys
 sys.path.insert(1, './src')
-from crfrnn_layer import CrfRnnLayer, CrfRnnLayerSP, CrfRnnLayerSPIO, CrfRnnLayerSPIOAT
+from crfrnn_layer import CrfRnnLayer, CrfRnnLayerSPIOAT
+from crfrnn_layer_all import CrfRnnLayerAll, CrfRnnLayerSP, CrfRnnLayerSPIO, CrfRnnLayerSPAT
 
 # -----------------------
 # Model design
@@ -561,8 +562,8 @@ def fcn_RESNET50_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
     model = Model(inputs=inputs, outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnn')
 
     # Fixing weighs in lower layers (optional)
-    # for layer in model.layers[:29]:  # 15,21,29 (overall 30 layers)
-    #     layer.trainable = False
+    for layer in model.layers[:181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
+        layer.trainable = False
 
     return model
 
@@ -575,8 +576,8 @@ def fcn_RESNET50_8s_crfrnnSP(INPUT_SIZE,nb_classes,num_crf_iterations):
     #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
     #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
     #saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep'
-    saved_model_path = '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/person_fine/person_fine_weights.200-0.54'
-    #saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
+    #saved_model_path = '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/person_fine/person_fine_weights.200-0.54'
+    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
 
     fcn.load_weights(saved_model_path)
 
@@ -602,8 +603,8 @@ def fcn_RESNET50_8s_crfrnnSP(INPUT_SIZE,nb_classes,num_crf_iterations):
 
 
     # Fixing weighs in lower layers (optional)
-    # for layer in model.layers[:29]:  # 15,21,29 (overall 30 layers)
-    #     layer.trainable = False
+    for layer in model.layers[:181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
+        layer.trainable = False
 
     return model
 
@@ -641,8 +642,47 @@ def fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE,nb_classes,num_crf_iterations):
     model = Model(inputs=[img_input, seg_input], outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnnSPIO')
 
     # Fixing weighs in lower layers (optional)
-    # for layer in model.layers[:29]:  # 15,21,29 (overall 30 layers)
-    #     layer.trainable = False
+    for layer in model.layers[:181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
+        layer.trainable = False
+
+    return model
+
+
+def fcn_RESNET50_8s_crfrnnSPAT(INPUT_SIZE,nb_classes,num_crf_iterations):
+    """ Returns Keras FCN-8 + CRFRNNlayer with SP term and Inside/outside term, based on ResNet50 model definition.
+
+    """
+    fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
+    #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
+    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
+    #saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_350ep'
+    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
+
+    fcn.load_weights(saved_model_path)
+
+    # two inputs:
+    img_input = fcn.layers[0].output
+    #seg_input = fcn.layers[0].output
+    seg_input = Input(shape=(INPUT_SIZE, INPUT_SIZE))
+
+    #fcn_score = fcn.output
+    fcn_score = fcn.get_layer('add_pred8_pred16_pred32').output
+
+    # Adding the crfrnn layer:
+    height, weight = INPUT_SIZE, INPUT_SIZE
+    crfrnn_output = CrfRnnLayerSPAT(image_dims=(height, weight),
+                                num_classes=nb_classes,
+                                theta_alpha=160.,
+                                theta_beta=90.,
+                                theta_gamma=3.,
+                                num_iterations=num_crf_iterations,  # 10 for test, 5 for train
+                                name='crfrnn')([fcn_score, img_input, seg_input])
+
+    model = Model(inputs=[img_input, seg_input], outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnnSPAT')
+
+    # Fixing weighs in lower layers (optional)
+    for layer in model.layers[:181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
+        layer.trainable = False
 
     return model
 
@@ -652,9 +692,9 @@ def fcn_RESNET50_8s_crfrnnSPIOAT(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
-    #saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_350ep'
     saved_model_path =  '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/horse_coarse/horse_coarse_weights.5000-0.39'
-    #saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
+    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
+    #saved_model_path = '/storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_500ep'
 
     fcn.load_weights(saved_model_path)
 
@@ -667,7 +707,7 @@ def fcn_RESNET50_8s_crfrnnSPIOAT(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     # Adding the crfrnn layer:
     height, weight = INPUT_SIZE, INPUT_SIZE
-    crfrnn_output = CrfRnnLayerSPIOAT(image_dims=(height, weight),
+    crfrnn_output = CrfRnnLayerAll(image_dims=(height, weight),
                                 num_classes=nb_classes,
                                 theta_alpha=160.,
                                 theta_beta=90.,
@@ -735,6 +775,11 @@ def load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations):
 
     elif model_name == 'fcn_RESNET50_8s_crfrnnSPIO':
         model = fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE, nb_classes, num_crf_iterations)
+        model.crf_flag = True
+        model.sp_flag = True
+
+    elif model_name == 'fcn_RESNET50_8s_crfrnnSPAT':
+        model = fcn_RESNET50_8s_crfrnnSPAT(INPUT_SIZE, nb_classes, num_crf_iterations)
         model.crf_flag = True
         model.sp_flag = True
 

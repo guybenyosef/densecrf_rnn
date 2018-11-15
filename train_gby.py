@@ -6,12 +6,11 @@ MIT License
 #from keras.optimizers import Adam
 #from keras.optimizers import SGD
 #from keras import backend as K
-#import matplotlib.pyplot as plt
 import pdb
 from models_gby import load_model_gby
 from datasets_gby import load_dataset
-#from models_gby import fcn_8s_Sadeep,fcn_8s_Sadeep_crfrnn
 from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters,compute_median_frequency_reweighting,load_segmentations
+from src.weighted_categorical_crossentropy import weighted_loss
 
 ## Import usual libraries
 import os
@@ -21,15 +20,12 @@ from keras.callbacks import CSVLogger
 from keras.optimizers import Adam
 from keras.layers import *
 import keras, sys, time, warnings
+import matplotlib.pyplot as plt
 import pandas as pd
 from keras import optimizers
 import argparse
 import pickle
 
-from src.weighted_categorical_crossentropy import weighted_loss
-
-## location of VGG weights
-VGG_Weights_path = "../FacialKeypoint/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5"
 
 RES_DIR = "/storage/gby/semseg/"
 
