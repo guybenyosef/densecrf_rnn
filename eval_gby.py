@@ -23,6 +23,7 @@ def argument_parser_eval():
     parser.add_argument('-ds', '--dataset', default='streets', help='The name of train/test sets', type=str)
     parser.add_argument('-vb', '--verbosemode', default=1, help='Specify the verbose mode',type=int)
     parser.add_argument('-is', '--inputsize', default=512, help='Specify the input size N, where N=rows,N=cols. ',type=int)
+    parser.add_argument('-g', '--gpu', default="2", help='Select visible gpu device [0-3]', type=str)
     return parser.parse_args()
 
 # ===========================
@@ -45,7 +46,7 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     config = tf.ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = 0.70 #0.95
-    config.gpu_options.visible_device_list = "2"
+    config.gpu_options.visible_device_list = args.gpu  # default: "2"
     set_session(tf.Session(config=config))
 
     print("python {}".format(sys.version))
@@ -78,7 +79,8 @@ if __name__ == '__main__':
     print(model_path_name)
     print('====================================================================================')
 
-    model = load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations)
+    finetune_path = ''
+    model = load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path)
 
     #loading weights:
     model.load_weights(model_path_name)

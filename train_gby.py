@@ -45,7 +45,9 @@ def argument_parser():
     parser.add_argument('-ro', '--rotation', type=float, default=None,
                         help='Whether to randomly rotate the image for data augmentation. Specifies the max rotation angle in degrees.')
     parser.add_argument('-se', '--stepsepoch', default=100, help='Specify the number of steps for epoch', type=int)
-    parser.add_argument('-g', '--gpu', default="2", help='Select visible gpu device [1,2,3,4]', type=str)
+    parser.add_argument('-g', '--gpu', default="2", help='Select visible gpu device [0-3]', type=str)
+    parser.add_argument('-ft', '--finetune_path', default='', help='Path for  finetuning weights', type=str)
+
 
     return parser.parse_args()
 
@@ -104,7 +106,7 @@ if __name__ == '__main__':
     # for training:
     num_crf_iterations = 5
 
-    model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations)
+    model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations, args.finetune_path)
 
     # if resuming training:
     if (args.weights is not None) and (os.path.exists(args.weights)):
