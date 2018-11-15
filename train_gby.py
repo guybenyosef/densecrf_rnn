@@ -97,9 +97,9 @@ if __name__ == '__main__':
     print(ds.X_test.shape, ds.y_test.shape)
     nb_classes = ds.nb_classes
 
-   # pdb.set_trace()
-   # with tf.device('/cpu:0'):
-   #     input_image, output_image = data_augmentation(input_image, output_image)
+    # pdb.set_trace()
+    # with tf.device('/cpu:0'):
+    #     input_image, output_image = data_augmentation(input_image, output_image)
     # ===============
     # LOAD model:
     # ===============
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     # Visualize the model performance:
     # --------------------------------
     shape = (INPUT_SIZE, INPUT_SIZE)
-    n_classes = nb_classes # 10
+    n_classes = nb_classes
 
     if save_graphics_mode:
 
