@@ -20,9 +20,9 @@ saved_model_path = '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/perso
 saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep'
 saved_model_path = '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/horse_coarse/horse_coarse_weights.5000-0.39'
 #
-saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
+saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep'
 #
-saved_model_path = ''
+#saved_model_path = ''
 
 
 # -----------------------

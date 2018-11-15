@@ -45,6 +45,7 @@ def argument_parser():
     parser.add_argument('-ro', '--rotation', type=float, default=None,
                         help='Whether to randomly rotate the image for data augmentation. Specifies the max rotation angle in degrees.')
     parser.add_argument('-se', '--stepsepoch', default=100, help='Specify the number of steps for epoch', type=int)
+    parser.add_argument('-g', '--gpu', default="2", help='Select visible gpu device [1,2,3,4]', type=str)
 
     return parser.parse_args()
 
@@ -68,7 +69,7 @@ if __name__ == '__main__':
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     config = tf.ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = 0.70 # default: "0.95"
-    config.gpu_options.visible_device_list = "2" # default: "2"
+    config.gpu_options.visible_device_list = args.gpu # default: "2"
     set_session(tf.Session(config=config))
 
     print("python {}".format(sys.version))

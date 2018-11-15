@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# running experiments for the horsefine:
+# running experiments for the horsecoarse:
 num_ep=1
 echo "num epochs is $num_ep"
 python train_gby.py -m fcn_RESNET50_8s_crfrnn -is 224 -ds horsecoarse -e $num_ep -bs 1
