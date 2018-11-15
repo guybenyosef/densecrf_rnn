@@ -850,7 +850,7 @@ class CrfRnnLayerSPIOAT(Layer):
             prod_tensor_att = tf.zeros(shape=(c, h, w))
 
             # iterate over all superpixels, # Sample the center of the image
-            for sp_indx in random.sample(range(200, 400), 5):  # sampling superpixels, otherwise memory is overloaded
+            for sp_indx in random.sample(range(200, 400), 1):  # sampling superpixels, otherwise memory is overloaded
                 print(sp_indx)
                 # This will put True where where sp index is sp_indx, False otherwise:
                 cond_sp_indx = tf.equal(extended_sp_map, sp_indx)

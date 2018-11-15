@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
 
     #pdb.set_trace()
-    data_augmentation_flag = True # False #
+    data_augmentation_flag = False # False #
 
     if not data_augmentation_flag:
         # option 1:
