@@ -11,6 +11,20 @@ sys.path.insert(1, './src')
 from crfrnn_layer import CrfRnnLayer, CrfRnnLayerSPIOAT
 from crfrnn_layer_all import CrfRnnLayerAll, CrfRnnLayerSP, CrfRnnLayerSPIO, CrfRnnLayerSPAT
 
+saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
+saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
+#
+saved_model_path = '/storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_500ep'
+saved_model_path = '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/person_fine/person_fine_weights.200-0.54'
+#
+saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep'
+saved_model_path = '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/horse_coarse/horse_coarse_weights.5000-0.39'
+#
+saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
+#
+saved_model_path = ''
+
+
 # -----------------------
 # Model design
 # -----------------------
@@ -538,11 +552,9 @@ def fcn_RESNET50_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
-    #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
-    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
-    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
 
-    fcn.load_weights(saved_model_path)
+    if not saved_model_path=='':
+        fcn.load_weights(saved_model_path)
 
     inputs = fcn.layers[0].output
 
@@ -573,13 +585,9 @@ def fcn_RESNET50_8s_crfrnnSP(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
-    #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
-    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
-    #saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep'
-    #saved_model_path = '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/person_fine/person_fine_weights.200-0.54'
-    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
 
-    fcn.load_weights(saved_model_path)
+    if not saved_model_path=='':
+        fcn.load_weights(saved_model_path)
 
     # two inputs:
     img_input = fcn.layers[0].output
@@ -614,16 +622,12 @@ def fcn_RESNET50_8s_crfrnnSPIO(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
-    #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
-    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
-    #saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_350ep'
-    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
 
-    fcn.load_weights(saved_model_path)
+    if not saved_model_path=='':
+        fcn.load_weights(saved_model_path)
 
     # two inputs:
     img_input = fcn.layers[0].output
-    #seg_input = fcn.layers[0].output
     seg_input = Input(shape=(INPUT_SIZE, INPUT_SIZE))
 
     #fcn_score = fcn.output
@@ -653,16 +657,12 @@ def fcn_RESNET50_8s_crfrnnSPAT(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
-    #saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
-    #saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
-    #saved_model_path = '/storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_350ep'
-    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
 
-    fcn.load_weights(saved_model_path)
+    if not saved_model_path=='':
+        fcn.load_weights(saved_model_path)
 
     # two inputs:
     img_input = fcn.layers[0].output
-    #seg_input = fcn.layers[0].output
     seg_input = Input(shape=(INPUT_SIZE, INPUT_SIZE))
 
     #fcn_score = fcn.output
@@ -692,11 +692,9 @@ def fcn_RESNET50_8s_crfrnnSPIOAT(INPUT_SIZE,nb_classes,num_crf_iterations):
 
     """
     fcn = fcn_RESNET50_8s(INPUT_SIZE, nb_classes)
-    saved_model_path =  '/storage/cfmata/deeplab/crf_rnn/crfasrnn_keras/results/horse_coarse/horse_coarse_weights.5000-0.39'
-    saved_model_path = '/storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_200ep'
-    #saved_model_path = '/storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_500ep'
 
-    fcn.load_weights(saved_model_path)
+    if not saved_model_path=='':
+        fcn.load_weights(saved_model_path)
 
     # two inputs:
     img_input = fcn.layers[0].output
