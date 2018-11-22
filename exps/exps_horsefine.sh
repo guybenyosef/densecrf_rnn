@@ -78,3 +78,5 @@ python train_gby.py -m fcn_RESNET50_8s -is 224 -ds horsecoarse -e 10 -bs 32 -g 0
 longjob -o run/11_20_fcn512personfine.txt python train_gby.py -m fcn_RESNET50_8s -is 512 -ds personfine -e 200 -bs 6 -g 0 -vb 2
 
 longjob -o run/11_22_fcn512personfine.txt python train_gby.py -m fcn_RESNET50_8s -is 512 -ds personfine -e 201 -bs 6 -g 0 -vb 2 -w /storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_200ep
+
+python predict_gby.py -m fcn_RESNET50_8s -is 512 -nc 25 -w /storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_200ep -im #
