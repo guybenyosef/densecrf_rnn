@@ -24,7 +24,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from keras import optimizers
 import argparse
+import ntpath
 import pickle
+import cv2
 
 
 RES_DIR = "/storage/gby/semseg/"
@@ -163,7 +165,11 @@ if __name__ == '__main__':
 
 
     #pdb.set_trace()
-    data_augmentation_flag = False # False #
+    data_augmentation_flag = False
+    if args.h_flip | args.v_flip | (not args.brightness==None) | (not   args.rotation==None):
+        data_augmentation_flag = True  # False #
+
+
 
     if not data_augmentation_flag:
         # option 1:
@@ -191,7 +197,7 @@ if __name__ == '__main__':
     # ===============
     # ANALYZE model:
     # ===============
-    save_graphics_mode = False
+    save_graphics_mode = True
     print_IoU_flag = True
     visualize_filters_flag = False
 
@@ -222,7 +228,7 @@ if __name__ == '__main__':
             plt.plot(hist1.history[key], label=key)
         plt.legend()
         #plt.show(block=False)
-        plt.savefig('loss_plot.pdf')
+        plt.savefig('loss_%s.pdf' % ntpath.basename(save_by_name))
 
     # Visualize the model performance:
     # --------------------------------
@@ -238,12 +244,13 @@ if __name__ == '__main__':
         for i in range(num_examples_to_plot):
 
             img_indx = i*4
-            img_is = (ds.X_test[img_indx] + 1) * (255.0 / 2)
+            img_is = ds.X_test[img_indx]
+            cv2.normalize(img_is, img_is, 0, 1, cv2.NORM_MINMAX)  # img_is = (ds.X_test[img_indx] + 1) * (255.0 / 2)
             seg = y_predi[img_indx]
             segtest = y_testi[img_indx]
 
             ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 1)
-            ax.imshow(img_is / 255.0)
+            ax.imshow(img_is) # ax.imshow(img_is / 255.0)
             if i == 0:
                 ax.set_title("original")
 
@@ -257,7 +264,7 @@ if __name__ == '__main__':
             if i == 0:
                 ax.set_title("true class")
 
-        plt.savefig('examples.png')
+        plt.savefig('examples_%s.png' % ntpath.basename(save_by_name))
 
 
 # usage:

@@ -14,15 +14,16 @@ from models_gby import load_model_gby
 from datasets_gby import load_dataset
 import matplotlib.pyplot as plt
 from utils_gby import IoU_ver2,give_color_to_seg_img
+import cv2
 import pdb
 
 def argument_parser_eval():
     parser = argparse.ArgumentParser(description='Process arguments')
     parser.add_argument('-m', '--model', default='fcn_RESNET50_8s', help='choose between \'fcn_VGG16_32s\',\'fcn_VGG16_8s\',\'fcn_RESNET50_32s\', and \'fcn_RESNET50_8s\' networks, with or without \'_crfrnn\' suffix', type=str)
     parser.add_argument('-w', '--weights', default=None, nargs='?', const=None, help='The absolute path of the weights',type=str)
-    parser.add_argument('-ds', '--dataset', default='streets', help='The name of train/test sets', type=str)
+    parser.add_argument('-ds', '--dataset', default='horsecoarse', help='The name of train/test sets', type=str)
     parser.add_argument('-vb', '--verbosemode', default=1, help='Specify the verbose mode',type=int)
-    parser.add_argument('-is', '--inputsize', default=512, help='Specify the input size N, where N=rows,N=cols. ',type=int)
+    parser.add_argument('-is', '--inputsize', default=224, help='Specify the input size N, where N=rows,N=cols. ',type=int)
     parser.add_argument('-g', '--gpu', default="2", help='Select visible gpu device [0-3]', type=str)
     return parser.parse_args()
 
@@ -114,12 +115,13 @@ if __name__ == '__main__':
     for i in range(num_examples_to_plot):
 
         img_indx = i*4
-        img_is = (ds.X_test[img_indx] + 1) * (255.0 / 2)
+        img_is = ds.X_test[img_indx]
+        cv2.normalize(img_is, img_is, 0, 1, cv2.NORM_MINMAX) # img_is = (ds.X_test[img_indx] + 1) * (255.0 / 2)
         seg = y_predi[img_indx]
         segtest = y_testi[img_indx]
 
         ax = fig.add_subplot(num_examples_to_plot, 3, 3 * i + 1)
-        ax.imshow(img_is / 255.0)
+        ax.imshow(img_is) # ax.imshow(img_is / 255.0)
         if i == 0:
             ax.set_title("original")
 

@@ -509,6 +509,8 @@ def fcn_RESNET50_8s(INPUT_SIZE,nb_classes):
     score_pred16_pred32 = Add()([score_pred32_upsample, score_pred16_upsample])
     score_pred8_pred16_pred32 = Add(name='add_pred8_pred16_pred32')([score_pred16_pred32, score_pred8_upsample])
 
+    #score_pred8_pred16_pred32 = BatchNormalization()(score_pred8_pred16_pred32)
+
     output = (Activation('softmax'))(score_pred8_pred16_pred32)
 
     model = Model(inputs=inputs, outputs=output, name='fcn_RESNET50_8s')
@@ -611,8 +613,8 @@ def fcn_RESNET50_8s_crfrnnSP(INPUT_SIZE,nb_classes,num_crf_iterations,finetune_p
 
 
     # Fixing weighs in lower layers (optional)
-    for layer in model.layers[:-1]: #[:181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
-        layer.trainable = False
+    # for layer in model.layers[:-1]: #[:181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
+    #     layer.trainable = False
 
     return model
 

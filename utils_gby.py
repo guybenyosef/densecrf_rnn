@@ -357,6 +357,9 @@ def give_color_to_seg_img(seg, n_classes):
     seg_img = np.zeros((seg.shape[0], seg.shape[1], 3)).astype('float')
     colors = sns.color_palette("hls", n_classes)
 
+    # setting the background color to be black
+    colors[0] = (0, 0, 0)
+
     for c in range(n_classes):
         segc = (seg == c)
         seg_img[:, :, 0] += (segc * (colors[c][0]))
