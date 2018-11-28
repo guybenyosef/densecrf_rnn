@@ -43,6 +43,7 @@ import pdb
 def argument_parser_eval():
     parser = argparse.ArgumentParser(description='Process arguments')
     parser.add_argument('-im', '--imagepath', default=None, help='Absolute image path', type=str)
+    parser.add_argument('-fl', '--folderpath', default=None, help='Absolute folder path', type=str)
     parser.add_argument('-m', '--model', default='fcn_RESNET50_8s', help='choose between \'fcn_VGG16_32s\',\'fcn_VGG16_8s\',\'fcn_RESNET50_32s\', and \'fcn_RESNET50_8s\' networks, with or without \'_crfrnn\' suffix', type=str)
     parser.add_argument('-w', '--weights', default=None, nargs='?', const=None, help='The absolute path of the weights',type=str)
     parser.add_argument('-nc', '--nbclasses', default=2, help='Number of labels', type=int)
@@ -73,14 +74,16 @@ if __name__ == '__main__':
 
     model_name = args.model
     model_path_name = args.weights
-    base_img_name = os.path.splitext(os.path.basename(args.imagepath))[0]
+    base_img_name = []
 
     print('====================================================================================')
     print(model_path_name)
     print('====================================================================================')
 
     finetune_path = ''
+    #pdb.set_trace()
     model = load_model_gby(model_name, INPUT_SIZE, n_classes, num_crf_iterations, finetune_path)
+
 
     #loading weights:
     model.load_weights(model_path_name)
@@ -88,31 +91,51 @@ if __name__ == '__main__':
     # Computing prediction:
     # ------------------------------
     print('computing prediction..')
-    img_org = cv2.imread(args.imagepath)
-    x = load_image(img_org, INPUT_SIZE)
+    if args.folderpath==None:
+        img_org = cv2.imread(args.imagepath)
+        x = load_image(img_org, INPUT_SIZE)
+        base_img_name.append(os.path.splitext(os.path.basename(args.imagepath))[0])
+    else:
+        X = []
+        outdirName = args.folderpath+'out/'
+        if not os.path.exists(outdirName):
+            os.mkdir(outdirName)
+
+        for filename in os.listdir(args.folderpath):
+            if filename.endswith('.jpg') or filename.endswith('.png'):
+                img_path = args.folderpath+filename
+                img_org = cv2.imread(img_path)
+                x = load_image(img_org, INPUT_SIZE)
+                X.append(x)
+                base_img_name.append(outdirName + os.path.splitext(os.path.basename(img_path))[0])
+        x = np.array(X)[:, 0, :, :, :]
+
+
     y_pred = model.predict(x, batch_size=1, verbose=1)
     y_predi = np.argmax(y_pred, axis=3)
 
-    # Visualize the model performance:
-    # --------------------------------
-    shape = (INPUT_SIZE, INPUT_SIZE)
+    for ii in range(len(base_img_name)):
 
-    fig = plt.figure(figsize=(10, 5))
+        # Visualize the model performance:
+        # --------------------------------
+        #shape = (INPUT_SIZE, INPUT_SIZE)
 
-    img_is = np.array(x[0, :, :, :])
-    cv2.normalize(img_is, img_is, 0, 1, cv2.NORM_MINMAX)
-    seg = y_predi[0,:,:]#[img_indx]
+        fig = plt.figure(figsize=(10, 5))
 
-    ax = fig.add_subplot(1, 2, 1)
-    ax.imshow(img_is) # ax.imshow(img_is / 255.0)
-    ax.set_title("original")
+        img_is = np.array(x[ii, :, :, :])
+        cv2.normalize(img_is, img_is, 0, 1, cv2.NORM_MINMAX)
+        seg = y_predi[ii,:,:]#[img_indx]
 
-    ax = fig.add_subplot(1, 2, 2)
-    ax.imshow(give_color_to_seg_img(seg, n_classes))
-    ax.set_title("predicted segmentation")
+        ax = fig.add_subplot(1, 2, 1)
+        ax.imshow(img_is) # ax.imshow(img_is / 255.0)
+        ax.set_title("original")
+
+        ax = fig.add_subplot(1, 2, 2)
+        ax.imshow(give_color_to_seg_img(seg, n_classes))
+        ax.set_title("predicted segmentation")
 
 
-    plt.savefig('%s_prediction_%s.png' % (base_img_name,ntpath.basename(model_path_name)))
+        plt.savefig('%s_prediction_%s.png' % (base_img_name[ii],ntpath.basename(model_path_name)))
 
     # clear model: Destroys the current TF graph and creates a new one. Useful to avoid clutter from old models / layers.
     keras.backend.clear_session()

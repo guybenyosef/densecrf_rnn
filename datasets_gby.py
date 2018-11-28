@@ -175,6 +175,8 @@ def personcoarse(INPUT_SIZE, dataaug_args):
     ds.segments_dir = segments_dir
     ds.train_list = train_data
     ds.test_list = val_data
+    ds.datagen_train = generate_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE,nb_classes, dataaug_args)
+    ds.datagen_test = generate_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, None)
 
     return ds
 
@@ -194,8 +196,36 @@ def personfine(INPUT_SIZE, dataaug_args):
     ds.segments_dir = segments_dir
     ds.train_list = train_data
     ds.test_list = val_data
+    ds.datagen_train = generate_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE,nb_classes, dataaug_args)
+    ds.datagen_test = generate_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, None)
 
     return ds
+
+# to debug:
+def horsecoarsedbg(INPUT_SIZE,dataaug_args):
+
+    nb_classes = 5+1
+    #horse: head, tail, torso, upper legs, lower legs
+
+    train_data = 'lst/horsecoarse_train_dbg.txt'
+    val_data = 'lst/horsecoarse_test_dbg.txt'
+    #image_dir = "/storage/gby/datasets/horse_coarse_parts/images_orig/"
+    image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
+    label_dir = '/storage/gby/datasets/horse_coarse_parts/labels_orig/'
+    segments_dir = '/storage/gby/datasets/horse_coarse_parts/sp_seg/'
+
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
+
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
+    ds.datagen_train = generate_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE,nb_classes, dataaug_args)
+    ds.datagen_test = generate_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, None)
+
+    return ds
+
+
+
 
 # ===================
 # load:
@@ -222,6 +252,9 @@ def load_dataset(ds_name,INPUT_SIZE, dataaug_args):
 
     elif ds_name == 'personfine':
         ds = personfine(INPUT_SIZE, dataaug_args)
+
+    elif ds_name == 'horsecoarsedbg':
+        ds = horsecoarsedbg(INPUT_SIZE, dataaug_args)
 
     else:
         print('ERROR: dataset name does not exist..')

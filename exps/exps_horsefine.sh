@@ -73,10 +73,22 @@ longjob -o run/11_21_fcn512horsefine.txt python train_gby.py -m fcn_RESNET50_8s 
 longjob -o run/20_11_fcn512+dataaug.txt python train_gby.py -m fcn_RESNET50_8s -is 512 -ds horsefine -e 5 -se 325 -bs 1 -g 0 -hf True -ro 10 -w /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_1000ep -vb 1
 
 
-python train_gby.py -m fcn_RESNET50_8s -is 224 -ds horsecoarse -e 10 -bs 32 -g 0 -vb 2
+python train_gby.py -m fcn_RESNET50_8s -is 512 -ds horsecoarsedbg -e 10 -bs 32 -g 0 -vb 2
 
 longjob -o run/11_20_fcn512personfine.txt python train_gby.py -m fcn_RESNET50_8s -is 512 -ds personfine -e 200 -bs 6 -g 0 -vb 2
 
-longjob -o run/11_22_fcn512personfine.txt python train_gby.py -m fcn_RESNET50_8s -is 512 -ds personfine -e 201 -bs 6 -g 0 -vb 2 -w /storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_200ep
+longjob -o run/11_27_fcn512personfine.txt python train_gby.py -m fcn_RESNET50_8s -is 512 -ds personfine -e 100 -se 1000 -bs 6 -g 0 -hf True -ro 10 -bs 6 -g 0 -vb 2 -w /storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_1000ep
 
 python predict_gby.py -m fcn_RESNET50_8s -is 512 -nc 25 -w /storage/gby/semseg/personfine_weights_fcn_RESNET50_8s_200ep -im #
+
+python predict_gby.py -m fcn_RESNET50_8s -is 512 -nc 21 -w /storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep -im 1012356625.jpg #
+
+
+
+longjob -o run/11_20_fcn512personfine.txt python train_gby.py -m fcn_RESNET50_8s -is 512 -ds voc2012 -e 2
+
+
+python train_gby.py -m fcn_RESNET50_8s_crfrnn -is 512 -ds horsecoarsedbg -e 11 -bs 1 -g 0 -vb 2 -w /storage/gby/semseg/horsecoarsedbg_weights_fcn_RESNET50_8s_crfrnn_is512_ep10
+python train_gby.py -m fcn_RESNET50_8s -is 512 -ds horsecoarsedbg -e 20 -bs 1 -g 3 -vb 2
+python train_gby.py -m fcn_VGG16_8s_crfrnn -is 512 -ds horsecoarsedbg -e 10 -bs 1 -g 0 -vb 1
+python train_gby.py -m fcn_VGG16_8s -is 512 -ds horsecoarsedbg -e 10 -bs 1 -g 2 -vb 1

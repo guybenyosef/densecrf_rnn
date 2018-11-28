@@ -129,7 +129,6 @@ if __name__ == '__main__':
         ds.X_train = [ds.X_train, segments_train]
         ds.X_test = [ds.X_test, segments_test]
 
-
     # ===============
     # TRAIN model:
     # ===============
@@ -190,7 +189,7 @@ if __name__ == '__main__':
     # ===============
     # SAVE model:
     # ===============
-    save_by_name = RES_DIR + args.dataset + '_weights_' + model.name + '_' + str(num_epochs) + 'ep'
+    save_by_name = RES_DIR + args.dataset + '_weights_' + model.name + '_is' + str(INPUT_SIZE) + '_ep' + str(num_epochs)
     model.save_weights(save_by_name)
     print("model saved to %s"%save_by_name)
 
@@ -243,7 +242,7 @@ if __name__ == '__main__':
 
         for i in range(num_examples_to_plot):
 
-            img_indx = i*4
+            img_indx = i*2 # i*4
             img_is = ds.X_test[img_indx]
             cv2.normalize(img_is, img_is, 0, 1, cv2.NORM_MINMAX)  # img_is = (ds.X_test[img_indx] + 1) * (255.0 / 2)
             seg = y_predi[img_indx]
