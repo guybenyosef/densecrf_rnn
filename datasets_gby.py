@@ -93,6 +93,8 @@ def streets(INPUT_SIZE, dataaug_args):
     ds.segments_dir = segments_dir
     ds.train_list = train_data
     ds.test_list = val_data
+    ds.datagen_train = generate_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
+    ds.datagen_test = generate_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, None)
 
     return ds
 
@@ -112,6 +114,8 @@ def voc2012(INPUT_SIZE, dataaug_args):
     ds.segments_dir = segments_dir
     ds.train_list = train_data
     ds.test_list = val_data
+    ds.datagen_train = generate_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
+    ds.datagen_test = generate_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, None)
 
     return ds
 

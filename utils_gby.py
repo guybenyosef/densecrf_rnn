@@ -4,8 +4,8 @@ import pdb
 from keras import backend as K
 
 # NOTE:   VGG16 or RESNET50
-#from keras.applications.vgg16 import preprocess_input, decode_predictions
-from keras.applications.resnet50 import preprocess_input, decode_predictions
+from keras.applications.vgg16 import preprocess_input, decode_predictions
+#from keras.applications.resnet50 import preprocess_input, decode_predictions
 
 # [DEP] from scipy.misc import imsave
 from PIL import Image
