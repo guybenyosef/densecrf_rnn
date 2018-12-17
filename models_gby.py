@@ -56,7 +56,9 @@ def fcn_VGG16_32s(INPUT_SIZE,nb_classes):
     vgg16 = VGG16(weights='imagenet', include_top=False, input_tensor=inputs)
     # score from the top vgg16 layer:
     score7 = vgg16.output
-    score7c = Conv2D(filters=nb_classes,kernel_size=(1, 1))(score7)
+    #score7 = Dropout(0.5)(score7)  # (optional)
+
+    score7c = Conv2D(filters=nb_classes,kernel_size=(1, 1), name='score7c')(score7)
     #
     score7c_upsample_32 = Conv2DTranspose(filters=nb_classes,
                                           kernel_size=(64, 64),
@@ -67,6 +69,7 @@ def fcn_VGG16_32s(INPUT_SIZE,nb_classes):
                                           name="score_pool7c_upsample_32")(score7c)
 
     fcn_output = (Activation('softmax'))(score7c_upsample_32)
+    #fcn_output = score7c_upsample_32
 
     model = Model(inputs=inputs, output=fcn_output, name='fcn_VGG16_32s')
 
@@ -75,7 +78,6 @@ def fcn_VGG16_32s(INPUT_SIZE,nb_classes):
     #     layer.trainable = False
 
     return model
-
 
 def fcn_VGG16_32s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
     """ Returns Keras FCN-32 + CRFRNN layer model definition.
@@ -806,6 +808,7 @@ def load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations, finet
 
     elif model_name == 'fcn_VGG16_8s':
         model = fcn_VGG16_8s(INPUT_SIZE, nb_classes)
+        #model = fcn_8s_Sadeep(INPUT_SIZE)
         model.crf_flag = False
         model.sp_flag = False
 

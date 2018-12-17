@@ -213,7 +213,7 @@ if __name__ == '__main__':
 
     # Visualize conv filters:
     # -------------------------------------
-    layer_name = 'score2' # 'crfrnn' 'score2'
+    layer_name = 'score_pool7c_upsample_32' # 'crfrnn' 'score2'
     if visualize_filters_flag:
         visualize_conv_filters(model, INPUT_SIZE, layer_name)
 
