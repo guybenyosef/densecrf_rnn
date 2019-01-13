@@ -79,10 +79,10 @@ def streets(INPUT_SIZE, dataaug_args):
 
     nb_classes = 11+1
 
-    train_data = 'lst/voc2012_train.txt'  # to fix
-    val_data = 'lst/voc2012_val.txt'  # to fix
-    image_dir = '/storage/gby/datasets/streets/images_prepped_train/'
-    label_dir = '/storage/gby/datasets/streets/annotations_prepped_train/'
+    train_data = 'lst/streets_train.txt'  # to fix
+    val_data = 'lst/streets_val.txt'  # to fix
+    image_dir = '/storage/gby/datasets/streets/all_imgs/'
+    label_dir = '/storage/gby/datasets/streets/all_labels/'
     segments_dir = ''
 
     #train_rate = 0.85
