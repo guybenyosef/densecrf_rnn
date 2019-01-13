@@ -151,8 +151,8 @@ if __name__ == '__main__':
 
     # Logger callback for learning curves
     csv_logger = CSVLogger('run/train_log.csv', append=True, separator=',')
-
-    if model.crf_flag:
+    #pdb.set_trace()
+    if model.crf_flag: # True:#
         model.compile(loss=weighted_loss(nb_classes, coefficients),
                       optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001),
                       metrics=['accuracy'])

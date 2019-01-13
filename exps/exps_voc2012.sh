@@ -9,8 +9,11 @@ python train_gby.py -m fcn_RESNET50_8s -is 224 -ds voc2012 -e $num_ep -bs 32 -g 
 python train_gby.py -m fcn_VGG16_8s -is 224 -ds voc2012 -e $num_ep -bs 32 -g $gpu_num
 python train_gby.py -m fcn_8s_Sadeep -is 224 -ds voc2012 -e $num_ep -bs 32 -g $gpu_num
 
+python train_gby.py -m fcn_VGG16_8s -is 224 -ds voc2012 -e 5 -bs 32 -g 1
+
+
 #python train_gby.py -m fcn_RESNET50_8s_crfrnnSP -is 224 -ds horsefine -e $num_ep -bs 1 -g $gpu_num -ft /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep
-#python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIO -is 224 -ds horsefine -e $num_ep -bs 1 -g $gpu_num -ft /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep
+    #python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIO -is 224 -ds horsefine -e $num_ep -bs 1 -g $gpu_num -ft /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep
 #python train_gby.py -m fcn_RESNET50_8s_crfrnnSPAT -is 224 -ds horsefine -e $num_ep -bs 1 -g $gpu_num -ft /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep
 #python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIOAT -is 224 -ds horsefine -e $num_ep -bs 1 -g $gpu_num -ft /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep
 
