@@ -228,6 +228,26 @@ def horsecoarsedbg(INPUT_SIZE,dataaug_args):
 
     return ds
 
+def voc2012dbg(INPUT_SIZE,dataaug_args):
+
+    nb_classes = 20 + 1
+
+    train_data = 'lst/voc2012_train_dbg.txt'
+    val_data = 'lst/voc2012_val_dbg.txt'
+    image_dir = '/storage/gby/datasets/pascal_voc12/images_orig/'
+    label_dir = '/storage/gby/datasets/pascal_voc12/labels_orig/'
+    segments_dir = ''
+
+    ds = split_from_list(train_data, val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
+
+    ds.segments_dir = segments_dir
+    ds.train_list = train_data
+    ds.test_list = val_data
+    ds.datagen_train = generate_arrays_from_file(train_data, image_dir, label_dir, INPUT_SIZE, nb_classes, dataaug_args)
+    ds.datagen_test = generate_arrays_from_file(val_data, image_dir, label_dir, INPUT_SIZE, nb_classes, None)
+
+    return ds
+
 
 
 
@@ -259,6 +279,9 @@ def load_dataset(ds_name,INPUT_SIZE, dataaug_args):
 
     elif ds_name == 'horsecoarsedbg':
         ds = horsecoarsedbg(INPUT_SIZE, dataaug_args)
+
+    elif ds_name == 'voc2012dbg':
+        ds = voc2012dbg(INPUT_SIZE, dataaug_args)
 
     else:
         print('ERROR: dataset name does not exist..')

@@ -79,13 +79,15 @@ def fcn_VGG16_32s(INPUT_SIZE,nb_classes):
 
     return model
 
-def fcn_VGG16_32s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
+def fcn_VGG16_32s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path):
     """ Returns Keras FCN-32 + CRFRNN layer model definition.
 
       """
     fcn = fcn_VGG16_32s(INPUT_SIZE,nb_classes)
-    saved_model_path = '/storage/gby/semseg/voc12_weights_fcn32_200ep'
-    fcn.load_weights(saved_model_path)
+    #saved_model_path = '/storage/gby/semseg/voc12_weights_fcn32_200ep'
+
+    if not finetune_path=='':
+        fcn.load_weights(finetune_path)
 
     inputs = fcn.layers[0].output
 
@@ -132,9 +134,13 @@ def fcn_VGG16_8s(INPUT_SIZE,nb_classes):    # previous name: fcn8s_take2
 
     # score from the top vgg16 layer:
     score_pool5 = vgg16.output
+    #score_pool5 = Dropout(0.5)(score_pool5)  # (optional)
+
     #n = 4096
     score6c = Conv2D(filters=4096, kernel_size=(7, 7), padding='same', name="conv6")(score_pool5)
+    score6c = Dropout(0.5)(score6c)  # we need dropout as regularization and weight decays for RNNs
     score7c = Conv2D(filters=4096, kernel_size=(1, 1), padding='same', name="conv7")(score6c)
+    score7c = Dropout(0.5)(score7c)  # we need dropout as regularization and weight decays for RNNs
 
     #score7c = Conv2D(filters=nb_classes,kernel_size=(1, 1))(score6c)
     score7c_upsample = Conv2DTranspose(filters=nb_classes,
@@ -167,8 +173,8 @@ def fcn_VGG16_8s(INPUT_SIZE,nb_classes):    # previous name: fcn8s_take2
                                    kernel_initializer=Constant(bilinear_upsample_weights(8, nb_classes)),
                                    name="score_7_4_3_up")(score_7_4_3)
 
-    # Batch Normalization: (optional)
-    #score_7_4_3_up = BatchNormalization()(score_7_4_3_up)
+    # Batch Normalization: (optional) -- another way to large weights and exploding gradient.
+    score_7_4_3_up = BatchNormalization()(score_7_4_3_up)
 
     output = (Activation('softmax'))(score_7_4_3_up)
 
@@ -195,21 +201,22 @@ def fcn_VGG16_8s(INPUT_SIZE,nb_classes):    # previous name: fcn8s_take2
     return model
 
 
-def fcn_VGG16_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
-    """ Returns Keras FCN-8 + CRFRNN layer model definition.
+def fcn_VGG16_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path):
+    """ Returns Keras FCN-8 + CRFRNN layer, based on VGG16 model definition.
 
-      """
-    fcn = fcn_VGG16_8s(INPUT_SIZE,nb_classes)
-    saved_model_path = '/storage/gby/semseg/streets_weights_vgg16fcn8s_5000ep'
-    #fcn.load_weights(saved_model_path)
+    """
+    fcn = fcn_VGG16_8s(INPUT_SIZE, nb_classes)
+
+    if not finetune_path=='':
+        fcn.load_weights(finetune_path)
 
     inputs = fcn.layers[0].output
+
     # Add plenty of zero padding
     #inputs = ZeroPadding2D(padding=(100, 100))(inputs)
 
+    # fcn_score = fcn.output
     fcn_score = fcn.get_layer('score_7_4_3_up').output
-    # used to be: fcn.output
-    #fcn_score = fcn.output
 
     # Adding the crfrnn layer:
     height, weight = INPUT_SIZE, INPUT_SIZE
@@ -459,7 +466,7 @@ def fcn_RESNET50_32s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations):
 def fcn_RESNET50_8s(INPUT_SIZE,nb_classes):
     """ Returns Keras FCN-8 + based on ResNet50 model definition.
 
-      """
+    """
 
     # Input and output layers for FCN:
     inputs = Input(shape=(INPUT_SIZE, INPUT_SIZE, 3))
@@ -578,8 +585,8 @@ def fcn_RESNET50_8s_crfrnn(INPUT_SIZE,nb_classes,num_crf_iterations,finetune_pat
     model = Model(inputs=inputs, outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnn')
 
     # Fixing weighs in lower layers (optional)
-    for layer in model.layers[:181]: #181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
-        layer.trainable = False
+   # for layer in model.layers[:181]: #181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
+   #     layer.trainable = False
 
     return model
 
@@ -802,18 +809,22 @@ def load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations, finet
         model.sp_flag = False
 
     elif model_name == 'fcn_VGG16_32s_crfrnn':
-        model = fcn_VGG16_32s_crfrnn(INPUT_SIZE, nb_classes)
+        model = fcn_VGG16_32s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path)
         model.crf_flag = True
         model.sp_flag = False
 
     elif model_name == 'fcn_VGG16_8s':
         model = fcn_VGG16_8s(INPUT_SIZE, nb_classes)
-        #model = fcn_8s_Sadeep(INPUT_SIZE)
+        model.crf_flag = False
+        model.sp_flag = False
+
+    elif model_name == 'fcn_VGG16_8s_Sadeep':
+        model = fcn_8s_Sadeep(INPUT_SIZE)
         model.crf_flag = False
         model.sp_flag = False
 
     elif model_name == 'fcn_VGG16_8s_crfrnn':
-        model = fcn_VGG16_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations)
+        model = fcn_VGG16_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path)
         model.crf_flag = True
         model.sp_flag = False
 
@@ -823,7 +834,7 @@ def load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations, finet
         model.sp_flag = False
 
     elif model_name == 'fcn_RESNET50_32s_crfrnn':
-        model = fcn_RESNET50_32s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations)
+        model = fcn_RESNET50_32s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path)
         model.crf_flag = True
         model.sp_flag = False
 

@@ -419,9 +419,9 @@ class CrfRnnLayer(Layer):
             pairwise = tf.reshape(pairwise, (c, h, w))
             q_values = unaries - pairwise
             #pdb.set_trace()
-            # for i in range(1):
-            #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
-            # pdb.set_trace()
+
+        # for i in range(1):
+        #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
 
         return tf.transpose(tf.reshape(q_values, (1, c, h, w)), perm=(0, 2, 3, 1))
 

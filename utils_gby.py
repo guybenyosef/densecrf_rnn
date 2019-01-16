@@ -239,9 +239,6 @@ def compute_median_frequency_reweighting(Yi):
 
     median_frequency_coef = median_count_labels/count_labels
 
-    print("median_frequency_reweighting:")
-    print(median_frequency_coef)
-
     return median_frequency_coef
 
 # -----------------------

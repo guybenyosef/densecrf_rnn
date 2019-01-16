@@ -10,7 +10,14 @@ python train_gby.py -m fcn_VGG16_8s -is 224 -ds voc2012 -e $num_ep -bs 32 -g $gp
 python train_gby.py -m fcn_8s_Sadeep -is 224 -ds voc2012 -e $num_ep -bs 32 -g $gpu_num
 
 python train_gby.py -m fcn_VGG16_8s -is 224 -ds voc2012 -e 5 -bs 32 -g 1
+python train_gby.py -m fcn_VGG16_8s -is 224 -ds horsecoarse -e 2 -bs 32 -g 1
 
+longjob -o run/15_01_fcn224voc2012_vgg8s.txt python train_gby.py fcn_VGG16_8s -is 224 -ds voc2012 -e 1000 -bs 32 -g 1 -vb 2
+
+python train_gby.py -m fcn_VGG16_8s_crfrnn -is 224 -ds voc2012dbg -e 2 -bs 1 -g 0
+
+python train_gby.py -m fcn_VGG16_32s_crfrnn -is 224 -ds voc2012dbg -e 1 -bs 1 -g 0 -vb 1 -ft /storage/gby/semseg/voc2012dbg_weights_fcn_VGG16_32s_is224_ep100
+python train_gby.py -m fcn_VGG16_8s_crfrnn -is 224 -ds voc2012dbg -e 1 -bs 1 -g 1 -vb 1 -ft /storage/gby/semseg/voc2012dbg_weights_fcn_VGG16_8s_is224_ep100
 
 #python train_gby.py -m fcn_RESNET50_8s_crfrnnSP -is 224 -ds horsefine -e $num_ep -bs 1 -g $gpu_num -ft /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep
     #python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIO -is 224 -ds horsefine -e $num_ep -bs 1 -g $gpu_num -ft /storage/gby/semseg/horsefine_weights_fcn_RESNET50_8s_500ep

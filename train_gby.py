@@ -23,6 +23,7 @@ import keras, sys, time, warnings
 import matplotlib.pyplot as plt
 import pandas as pd
 from keras import optimizers
+from keras import regularizers
 import argparse
 import ntpath
 import pickle
@@ -86,7 +87,7 @@ if __name__ == '__main__':
 
     INPUT_SIZE = args.inputsize  #500 #224 #512
 
-    # parameters for data sugmentation:
+    # parameters for data augmentation:
     # dataaug_args = {}
     # dataaug_args.h_flip = args.h_flip
     # dataaug_args.v_flip = args.v_flip
@@ -148,16 +149,22 @@ if __name__ == '__main__':
     # for weighted_loss_coefficients
     y_traini = np.argmax(ds.y_train, axis=3)
     coefficients = list(compute_median_frequency_reweighting(y_traini))
+    print("Median_frequency_reweighting:")
+    print(coefficients)
 
     # Logger callback for learning curves
     csv_logger = CSVLogger('run/train_log.csv', append=True, separator=',')
     #pdb.set_trace()
     if model.crf_flag: # True:#
+        print("Using weighted categorical crossentropy loss..")
         model.compile(loss=weighted_loss(nb_classes, coefficients),
                       optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.001),
                       metrics=['accuracy'])
+
     else:
-        model.compile(loss='categorical_crossentropy',
+        print("Using categorical crossentropy loss..")
+        #model.compile(loss='categorical_crossentropy',
+        model.compile(loss=weighted_loss(nb_classes, coefficients),
                       optimizer='sgd',
                       metrics=['accuracy'])
                       #callbacks=['csv_logger'])
@@ -169,7 +176,7 @@ if __name__ == '__main__':
         data_augmentation_flag = True  # False #
 
 
-
+    #pdb.set_trace()
     if not data_augmentation_flag:
         # option 1:
         print("NOT using data augmentation..")
@@ -184,6 +191,7 @@ if __name__ == '__main__':
                           steps_per_epoch=args.stepsepoch,
                           use_multiprocessing=True,
                           epochs=num_epochs, verbose=verbose_mode)
+
 
 
     # ===============
