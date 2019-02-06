@@ -24,7 +24,7 @@ def weighted_loss(num_classes, coefficients):
 
             logits = logits + epsilon
             # consturct one-hot label array
-            pdb.set_trace()
+            #pdb.set_trace()
             labels = tf.to_float(tf.reshape(labels, (-1, num_classes)))
             softmax = tf.nn.softmax(logits)
             #pdb.set_trace()

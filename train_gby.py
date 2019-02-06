@@ -10,7 +10,7 @@ import pdb
 from models_gby import load_model_gby
 from datasets_gby import load_dataset
 from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters,compute_median_frequency_reweighting,load_segmentations
-from src.weighted_categorical_crossentropy import weighted_loss
+from src.weighted_categorical_crossentropy_parallel import weighted_loss
 
 ## Import usual libraries
 import os
@@ -87,6 +87,7 @@ if __name__ == '__main__':
     # ===============
 
     INPUT_SIZE = args.inputsize  #500 #224 #512
+    batch_size = args.batchsize
 
     # parameters for data augmentation:
     # dataaug_args = {}
@@ -99,31 +100,30 @@ if __name__ == '__main__':
     print(ds.X_train.shape, ds.y_train.shape)
     print(ds.X_test.shape, ds.y_test.shape)
     nb_classes = ds.nb_classes
-    batch_size = args.batchsize
 
-    parallel_CRF_flag = false
-
-    if parallel_CRF_flag:
-        # Calculate batch sizes as an array (for parallelization)
-        batch_sizes_train, batch_sizes_val, batch_sizes_total = [], [], []
-        (train_quotient, train_remainder) = divmod(ds.X_train.shape[0], batch_size)
-        (test_quotient, test_remainder) = divmod(ds.X_test.shape[0], batch_size)
-        for i in range(train_quotient):
-            batch_sizes_train.append(batch_size)
-            batch_sizes_total.append(batch_size)
-        if train_remainder != 0:
-            batch_sizes_train.append(train_remainder)
-            batch_sizes_total.append(train_remainder)
-        for i in range(test_quotient):
-            batch_sizes_val.append(batch_size)
-            batch_sizes_total.append(batch_size)
-        if test_remainder != 0:
-            batch_sizes_val.append(test_remainder)
-            batch_sizes_total.append(test_remainder)
-
-        print("batch sizes train ", batch_sizes_train)
-        print("batch sizes val ", batch_sizes_val)
-        print("batch sizes total ", batch_sizes_total)
+    # parallel_CRF_flag = True #False
+    #
+    # if parallel_CRF_flag:
+    #     # Calculate batch sizes as an array (for parallelization)
+    #     batch_sizes_train, batch_sizes_val, batch_sizes_total = [], [], []
+    #     (train_quotient, train_remainder) = divmod(ds.X_train.shape[0], batch_size)
+    #     (test_quotient, test_remainder) = divmod(ds.X_test.shape[0], batch_size)
+    #     for i in range(train_quotient):
+    #         batch_sizes_train.append(batch_size)
+    #         batch_sizes_total.append(batch_size)
+    #     if train_remainder != 0:
+    #         batch_sizes_train.append(train_remainder)
+    #         batch_sizes_total.append(train_remainder)
+    #     for i in range(test_quotient):
+    #         batch_sizes_val.append(batch_size)
+    #         batch_sizes_total.append(batch_size)
+    #     if test_remainder != 0:
+    #         batch_sizes_val.append(test_remainder)
+    #         batch_sizes_total.append(test_remainder)
+    #
+    #     print("batch sizes train ", batch_sizes_train)
+    #     print("batch sizes val ", batch_sizes_val)
+    #     print("batch sizes total ", batch_sizes_total)
 
     # pdb.set_trace()
     # with tf.device('/cpu:0'):
@@ -135,12 +135,8 @@ if __name__ == '__main__':
     # for training:
     num_crf_iterations = 5
 
-    if parallel_CRF_flag:
-        model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations, args.finetune_path, batch_size,
-                           batch_sizes_train, batch_sizes_val, batch_sizes_total)
-    else:
-        model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations, args.finetune_path)
-
+    model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations, args.finetune_path, batch_size)
+                           #,batch_sizes_train, batch_sizes_val, batch_sizes_total)
 
     # if resuming training:
     if (args.weights is not None) and (os.path.exists(args.weights)):

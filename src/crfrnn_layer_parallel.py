@@ -32,6 +32,8 @@ def _diagonal_initializer(shape):
 def _potts_model_initializer(shape):
     return -1 * _diagonal_initializer(shape)
 
+def _batch_init(shape):
+    return 0
 
 class CrfRnnLayer(Layer):
     """ Implements the CRF-RNN layer described in:
@@ -41,13 +43,16 @@ class CrfRnnLayer(Layer):
     """
 
     def __init__(self, image_dims, num_classes,
-                 theta_alpha, theta_beta, theta_gamma,
+                 theta_alpha, theta_beta, theta_gamma, batch_size, 
                  num_iterations, **kwargs):
         self.image_dims = image_dims
         self.num_classes = num_classes
         self.theta_alpha = theta_alpha
         self.theta_beta = theta_beta
         self.theta_gamma = theta_gamma
+        
+        self.batch_size = batch_size
+        
         self.num_iterations = num_iterations
         self.spatial_ker_weights = None
         self.bilateral_ker_weights = None
@@ -76,25 +81,23 @@ class CrfRnnLayer(Layer):
         super(CrfRnnLayer, self).build(input_shape)
 
     def call(self, inputs):
-        batch_size = 2
-        # python lists for variables
-        unary_list, rgb_list, q_values_list, = [], [], []
-        #for j in range(batch_size):
-        #    unary_list.append(tf.transpose(inputs[0][j,:,:,:], perm=(2,0,1)))
-        #    rgb_list.append(tf.transpose(inputs[1][j,:,:,:], perm=(2,0,1)))
-        unary_list = [tf.transpose(inputs[0][0,:,:,:], perm=(2,0,1))]
-        # For now add the first image twice to avoid an indexing error; change indx to 1 to add the second img input
-        unary_list.append(tf.transpose(inputs[0][0,:,:,:], perm=(2,0,1)))
-        rgb_list = [tf.transpose(inputs[1][0,:,:,:], perm=(2,0,1))]
-        # Same with rgb input
-        rgb_list.append(tf.transpose(inputs[1][0,:,:,:], perm=(2,0,1)))
+        # Python lists for variables
+        unary_list, rgb_list, q_values_list = [], [], []
+
+        # Add each input to a list
+        for j in range(self.batch_size):
+            unary_list.append(tf.transpose(inputs[0][j,:,:,:], perm=(2,0,1)))
+            rgb_list.append(tf.transpose(inputs[1][j,:,:,:], perm=(2,0,1)))
+
         unaries_tensor = tf.stack(unary_list)
         rgb_tensor = tf.stack(rgb_list)
-        for j in range(batch_size):
-            #unaries = tf.transpose(inputs[0][j, :, :, :], perm=(2, 0, 1)) # the fcn_scores
-            unaries = unaries_tensor[j]
-            #rgb = tf.transpose(inputs[1][j, :, :, :], perm=(2, 0, 1)) # the raw rgb
-            rgb = rgb_tensor[j]
+
+        #q_values_list = [0] * self.batch_size #tf.zeros(shape=(self.batch_size))
+        # Iterate over each img in inputs
+        for k in range(self.batch_size):
+        #def while_body(index, q_values_list):
+            unaries = unaries_tensor[k]
+            rgb = rgb_tensor[k]
             
             c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
             all_ones = np.ones((c, h, w), dtype=np.float32)
@@ -135,9 +138,17 @@ class CrfRnnLayer(Layer):
                 # Adding unary potentials
                 pairwise = tf.reshape(pairwise, (c, h, w))
                 q_values = unaries - pairwise
+                
+            #q_values_list[index] = q_values
             q_values_list.append(q_values)
+            #return index+1, q_values_list
+
+        #index = 0
+        #cond = lambda index, q_values_list: tf.less(index, self.batch_size)
+        #res = tf.while_loop(cond, while_body, [index, q_values_list], parallel_iterations=self.batch_size, back_prop=False)
         l = tf.stack(q_values_list)
-        return tf.transpose(tf.reshape(l, (batch_size, c, h, w)), perm=(0, 2, 3, 1))
+        print("l ", l)
+        return tf.transpose(tf.reshape(l, (self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1])), perm=(0, 2, 3, 1))
 
     def compute_output_shape(self, input_shape):
         return input_shape
