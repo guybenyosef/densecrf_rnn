@@ -237,14 +237,16 @@ def fcn_VGG16_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_pat
     return model
 
 
-def fcn_8s_Sadeep(nb_classes):
+def fcn_8s_Sadeep(INPUT_SIZE, nb_classes):
     """ Returns Keras CRF-RNN model definition.
 
     Currently, only 500 x 500 images are supported. However, one can get this to
     work with different image sizes by adjusting the parameters of the Cropping2D layers
     below.
     """
-    channels, height, weight = 3, 500, 500
+    assert INPUT_SIZE == 500, print("Error: INPUT SIZE must be 500!")
+
+    channels, height, weight = 3, INPUT_SIZE, INPUT_SIZE
 
     # Input
     input_shape = (height, weight, 3)
@@ -321,15 +323,17 @@ def fcn_8s_Sadeep(nb_classes):
     return model
 
 
-def fcn_8s_Sadeep_crfrnn(nb_classes,num_crf_iterations):
+def fcn_8s_Sadeep_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path):
     """ Returns Keras FCN-8 + CRFRNN layer model definition.
 
       """
-    INPUT_SIZE = 500
+    assert INPUT_SIZE == 500, print("Error: INPUT SIZE must be 500!")
 
-    fcn = fcn_8s_Sadeep(nb_classes)
-    saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_500ep'
-    fcn.load_weights(saved_model_path)
+    fcn = fcn_8s_Sadeep(INPUT_SIZE, nb_classes)
+    #saved_model_path = '/storage/gby/semseg/streets_weights_fcn8s_Sadeep_500ep'
+    #fcn.load_weights(saved_model_path)
+    if not finetune_path == '':
+        fcn.load_weights(finetune_path)
 
     inputs = fcn.layers[0].output
     #seg_input = fcn.layers[0].output
@@ -345,7 +349,7 @@ def fcn_8s_Sadeep_crfrnn(nb_classes,num_crf_iterations):
     crfrnn_output = CrfRnnLayer(image_dims=(height, weight),
                              num_classes=nb_classes,
                              theta_alpha=160.,
-                             theta_beta=90.,  #3.
+                             theta_beta=3., #90.,  #3.
                              theta_gamma=3.,
                              num_iterations=num_crf_iterations, # 10 in test time, 5 in train time
                              name='crfrnn')([fcn_score, inputs])
@@ -818,15 +822,21 @@ def load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations, finet
         model.crf_flag = False
         model.sp_flag = False
 
-    elif model_name == 'fcn_VGG16_8s_Sadeep':
-        model = fcn_8s_Sadeep(INPUT_SIZE)
-        model.crf_flag = False
-        model.sp_flag = False
-
     elif model_name == 'fcn_VGG16_8s_crfrnn':
         model = fcn_VGG16_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path)
         model.crf_flag = True
         model.sp_flag = False
+
+    elif model_name == 'fcn_VGG16_8s_Sadeep':
+        model = fcn_8s_Sadeep(INPUT_SIZE, nb_classes)
+        model.crf_flag = False
+        model.sp_flag = False
+
+    elif model_name == 'fcn_VGG16_8s_Sadeep_crfrnn':
+        model = fcn_8s_Sadeep_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path)
+        model.crf_flag = True
+        model.sp_flag = False
+
 
     elif model_name == 'fcn_RESNET50_32s':
         model = fcn_RESNET50_32s(INPUT_SIZE, nb_classes)

@@ -14,6 +14,9 @@ python train_gby.py -m fcn_VGG16_8s -is 224 -ds horsecoarse -e 2 -bs 32 -g 1
 
 longjob -o run/15_01_fcn224voc2012_vgg8s.txt python train_gby.py fcn_VGG16_8s -is 224 -ds voc2012 -e 1000 -bs 32 -g 1 -vb 2
 
+longjob -o run/2019_01_17_voc2012_Saddeep.txt python train_gby.py -m fcn_VGG16_8s_Sadeep -is 500 -ds voc2012dbg -e 100 -bs 6 -g 0 -vb 2
+
+python train_gby.py -m fcn_VGG16_8s_Sadeep_crfrnn -is 500 -ds voc2012dbg -e 2 -bs 1 -g 2
 python train_gby.py -m fcn_VGG16_8s_crfrnn -is 224 -ds voc2012dbg -e 2 -bs 1 -g 0
 
 python train_gby.py -m fcn_VGG16_32s_crfrnn -is 224 -ds voc2012dbg -e 1 -bs 1 -g 0 -vb 1 -ft /storage/gby/semseg/voc2012dbg_weights_fcn_VGG16_32s_is224_ep100

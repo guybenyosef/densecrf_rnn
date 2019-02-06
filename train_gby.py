@@ -75,6 +75,7 @@ if __name__ == '__main__':
     config = tf.ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = 0.70 # default: "0.95"
     config.gpu_options.visible_device_list = args.gpu # default: "2"
+    config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.OFF
     set_session(tf.Session(config=config))
 
     print("python {}".format(sys.version))
@@ -98,6 +99,31 @@ if __name__ == '__main__':
     print(ds.X_train.shape, ds.y_train.shape)
     print(ds.X_test.shape, ds.y_test.shape)
     nb_classes = ds.nb_classes
+    batch_size = args.batchsize
+
+    parallel_CRF_flag = false
+
+    if parallel_CRF_flag:
+        # Calculate batch sizes as an array (for parallelization)
+        batch_sizes_train, batch_sizes_val, batch_sizes_total = [], [], []
+        (train_quotient, train_remainder) = divmod(ds.X_train.shape[0], batch_size)
+        (test_quotient, test_remainder) = divmod(ds.X_test.shape[0], batch_size)
+        for i in range(train_quotient):
+            batch_sizes_train.append(batch_size)
+            batch_sizes_total.append(batch_size)
+        if train_remainder != 0:
+            batch_sizes_train.append(train_remainder)
+            batch_sizes_total.append(train_remainder)
+        for i in range(test_quotient):
+            batch_sizes_val.append(batch_size)
+            batch_sizes_total.append(batch_size)
+        if test_remainder != 0:
+            batch_sizes_val.append(test_remainder)
+            batch_sizes_total.append(test_remainder)
+
+        print("batch sizes train ", batch_sizes_train)
+        print("batch sizes val ", batch_sizes_val)
+        print("batch sizes total ", batch_sizes_total)
 
     # pdb.set_trace()
     # with tf.device('/cpu:0'):
@@ -109,7 +135,12 @@ if __name__ == '__main__':
     # for training:
     num_crf_iterations = 5
 
-    model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations, args.finetune_path)
+    if parallel_CRF_flag:
+        model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations, args.finetune_path, batch_size,
+                           batch_sizes_train, batch_sizes_val, batch_sizes_total)
+    else:
+        model = load_model_gby(args.model, INPUT_SIZE, nb_classes, num_crf_iterations, args.finetune_path)
+
 
     # if resuming training:
     if (args.weights is not None) and (os.path.exists(args.weights)):
@@ -143,7 +174,6 @@ if __name__ == '__main__':
     #model.compile(loss="categorical_crossentropy", optimizer='Adadelta', metrics=['accuracy'])
 
     num_epochs = args.epochs
-    batch_size = args.batchsize
     verbose_mode = args.verbosemode
     #   coefficients = ds.weighted_loss_coefficients
     # for weighted_loss_coefficients
@@ -163,8 +193,9 @@ if __name__ == '__main__':
 
     else:
         print("Using categorical crossentropy loss..")
-        #model.compile(loss='categorical_crossentropy',
-        model.compile(loss=weighted_loss(nb_classes, coefficients),
+        model.compile(loss='categorical_crossentropy',
+        #print("Using weighted categorical crossentropy loss..")
+        #model.compile(loss=weighted_loss(nb_classes, coefficients),
                       optimizer='sgd',
                       metrics=['accuracy'])
                       #callbacks=['csv_logger'])
@@ -191,7 +222,6 @@ if __name__ == '__main__':
                           steps_per_epoch=args.stepsepoch,
                           use_multiprocessing=True,
                           epochs=num_epochs, verbose=verbose_mode)
-
 
 
     # ===============
