@@ -10,6 +10,7 @@ import pdb
 from models_gby import load_model_gby
 from datasets_gby import load_dataset
 from utils_gby import IoU_ver2,give_color_to_seg_img,visualize_conv_filters,compute_median_frequency_reweighting,load_segmentations
+#from src.weighted_categorical_crossentropy import weighted_loss
 from src.weighted_categorical_crossentropy_parallel import weighted_loss
 
 ## Import usual libraries
@@ -149,13 +150,58 @@ if __name__ == '__main__':
     # ===============
     # LOAD sp segment:
     # ===============
+    # if model.sp_flag:
+    #     segments_train = load_segmentations(ds.segments_dir, ds.train_list, INPUT_SIZE)
+    #     segments_test = load_segmentations(ds.segments_dir, ds.test_list, INPUT_SIZE)
+    #     print("Loading superpixels segmentations:")
+    #     print(segments_train.shape, segments_test.shape)
+    #     ds.X_train = [ds.X_train, segments_train]
+    #     ds.X_test = [ds.X_test, segments_test]
+
+
+    # ------- PARALLELIZATION -------------
     if model.sp_flag:
         segments_train = load_segmentations(ds.segments_dir, ds.train_list, INPUT_SIZE)
         segments_test = load_segmentations(ds.segments_dir, ds.test_list, INPUT_SIZE)
         print("Loading superpixels segmentations:")
         print(segments_train.shape, segments_test.shape)
+    else:
+        segments_train = np.array([])
+        segments_test = np.array([])
+
+        # Pad training/val sets with random imgs to get number divisible by batch_size; can change to using images from next epoch
+        # (train_quotient, train_remainder) = divmod(ds.X_train.shape[0], batch_size)
+    train_remainder = ds.X_train.shape[0] % batch_size
+    print("train remainder ", train_remainder)
+    if train_remainder != 0:
+        # Choose random indices for extra imgs
+        print("train high bound ", ds.X_train.shape[0])
+        indices_train = np.random.randint(0, high=ds.X_train.shape[0], size=batch_size - train_remainder)
+        print("len extra train ", len(indices_train))
+        for i in indices_train:
+            ds.X_train = np.concatenate((ds.X_train, [ds.X_train[i]]), axis=0)
+            ds.y_train = np.concatenate((ds.y_train, [ds.y_train[i]]), axis=0)
+            if model.sp_flag:
+                segments_train = np.concatenate((segments_train, [segments_train[i]]), axis=0)
+
+    print("new len ", len(ds.X_train), len(segments_train))
+
+    # (test_quotient, test_remainder) = divmod(ds.X_test.shape[0], batch_size)
+    test_remainder = ds.X_test.shape[0] % batch_size
+    if test_remainder != 0:
+        indices_test = np.random.randint(0, high=ds.X_test.shape[0], size=batch_size - test_remainder)
+        # print("len extra test ", len(indices_test))
+        for i in indices_test:
+            ds.X_test = np.concatenate((ds.X_test, [ds.X_test[i]]), axis=0)
+            ds.y_test = np.concatenate((ds.y_test, [ds.y_test[i]]), axis=0)
+            if model.sp_flag:
+                segments_test = np.concatenate((segments_test, [segments_test[i]]), axis=0)
+
+    if model.sp_flag:
         ds.X_train = [ds.X_train, segments_train]
         ds.X_test = [ds.X_test, segments_test]
+    # ------- END OF PARALLELIZATION -------------
+
 
     # ===============
     # TRAIN model:
