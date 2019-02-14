@@ -29,6 +29,7 @@ python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIO -is 224 -ds horsecoarsedbg -e 
 
 
 longjob -o run/2019_02_14_report.txt python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIO -is 224 -ds horsecoarse -e 200 -bs 1 -g 3
+longjob -o run/2019_02_14_report_horsefine.txt python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIO -is 224 -ds horsefine -e 200 -bs 1 -g 3 -vb 2
 python train_gby.py -m fcn_RESNET50_8s_crfrnnSPIO -is 224 -ds horsecoarse -e 2 -bs 1 -g 3
 
 

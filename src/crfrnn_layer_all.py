@@ -429,7 +429,7 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
 
     i=0
     cond = lambda i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor: tf.less(i, len(sp_indices))
-    res = tf.while_loop(cond, while_body, [i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor], parallel_iterations=len(sp_indices), back_prop=False)
+    i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor = tf.while_loop(cond, while_body, [i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor], parallel_iterations=len(sp_indices), back_prop=False)
 
     # modified q_values: (Avoid division by zero from q_values)
     bool_sum_zero = tf.equal(q_values, 0)
