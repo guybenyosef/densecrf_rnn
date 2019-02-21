@@ -46,63 +46,51 @@ def _sp_low_weight_initializer(shape):
 def _low_weight_initializer(shape):
     return np.ones(shape=shape, dtype=np.float32)
 
-def _compute_superpixel_update(q_values, superpixel_low_weights, superpixel_high_weights, superpixel_cliques, sp_indices, c, h, w ):
+def _compute_superpixel_update(q_values,superpixel_low_weights,superpixel_high_weights,superpixel_cliques, sp_indices, c, h, w ):
     # compute superpixel tensor:
     # ---------------------------
+    sp_map = superpixel_cliques
 
     # replicate the sp_map m times and have the shape of [rows,cols,m], where m is the number of labels
     extended_sp_map = tf.tile(tf.reshape(superpixel_cliques, [1, h, w]), [c, 1, 1])
-
-    tf.Print(q_values, [q_values[10]], message="q_values first: ")
-
-
+    
     def while_body(index, prod_tensor):
         sp_indx = tf.to_float(index)
         cond_sp_indx = tf.equal(extended_sp_map, sp_indx)
-        q_val_for_sp = tf.multiply(tf.to_float(cond_sp_indx), q_values)
-        B = tf.reduce_logsumexp(q_val_for_sp, [1,2])
-        #C1 = tf.stack([B] * (h*w))
-        C1 = tf.tile(tf.reshape(B, [1,6]), [h*w, 1])
+        # Adding epsilon = 0.00001 to q_values before taking log, to prevent nan
+        q_val_for_sp = tf.multiply(tf.to_float(cond_sp_indx), q_values + 0.00001) + tf.to_float(tf.logical_not(cond_sp_indx))
+
+        B = tf.reduce_sum(tf.log(q_val_for_sp), axis=[1,2])
+    
+        C1 = tf.tile(tf.reshape(B, [1,6]), [h*w, 1])    
         C2 = tf.reshape(tf.transpose(C1), (c,h,w))
         C3 = tf.to_float(tf.multiply(tf.to_float(cond_sp_indx), C2))
+
         prod_tensor += C3
         return index+1, prod_tensor
 
     i = 0
     # initialize to zeros
     prod_tensor = tf.zeros(shape=(c, h, w))
-    cond = lambda i, prod_tensor: tf.less(i, len(sp_indices)) # tf.less(i, 150)
-    time1 = time.time()
+    cond = lambda i, prod_tensor: tf.less(i, len(sp_indices))
     i, prod_tensor = tf.while_loop(cond, while_body, [i, prod_tensor], parallel_iterations=len(sp_indices))
-    time2 = time.time()
-    print("while loop time ",time2-time1)
 
-    # for i in range(1):
-    #     prod_tensor = tf.Print(prod_tensor, [prod_tensor[i]], message="prod_tensor first 500 ", summarize=500)
-
-
-    # and now the update rule for superpixel
-    # the actual product: we need to divide it by the current q_vals
-    bool_sum_zero = tf.equal(q_values, 0)
-    bool_sum_one = tf.to_float(bool_sum_zero)
-    q_values_modified = q_values + bool_sum_one
-    first_term = tf.divide(tf.to_float(prod_tensor), q_values_modified)
+    # adding epsilon = 0.00001 to q_vals before taking log, to prevent nan
+    first_term_unexp = tf.subtract(tf.to_float(prod_tensor), tf.log(q_values+ 0.00001))
+    first_term = tf.exp(first_term_unexp)
 
     # multiply by weights:
-    #superpixel_low_weights_duplicated = tf.transpose(tf.stack([superpixel_low_weights] *(h*w)))
     superpixel_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(superpixel_low_weights, [1,6]), [h*w, 1]))
     first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
 
-    # for i in range(1):
-    #     first_term_resp_back = tf.Print(first_term_resp_back, [first_term_resp_back[i]], message="first_term_resp_back first 500 ", summarize=500)
-
     superpixel_update = first_term_resp_back + superpixel_high_weights * (tf.ones(shape=(c, h, w)) - first_term)
 
+    #To avoid nan in final update, can also clip if other methods don't work
+    #clip = tf.clip_by_value(superpixel_update,low,high)
     return superpixel_update
 
 def _compute_containment_update(q_values,containment_low_weights,containment_high_weights,bd_map, sp_indices, c, h, w ):
-    ''' containment_low_weights expected to have shape=(6), high weights shape=(1) '''
 
     extended_bd_map = tf.stack([bd_map]*c)
 
@@ -115,7 +103,7 @@ def _compute_containment_update(q_values,containment_low_weights,containment_hig
         sp_indx = tf.to_float(index)
         # This will put True where bd index is clique_indx, False otherwise:
         bool_bd_indx = tf.equal(extended_bd_map,sp_indx)
-        q_val_for_clique = tf.multiply(tf.to_float(bool_bd_indx), q_values)
+        q_val_for_clique = tf.multiply(tf.to_float(bool_bd_indx), q_values + 0.00001)
 
         # put 1 in q_vals if a pixel is not in sp_indx:
         q_val_for_clique_padded = q_val_for_clique  + tf.to_float(tf.logical_not(bool_bd_indx))
@@ -136,7 +124,8 @@ def _compute_containment_update(q_values,containment_low_weights,containment_hig
 
         # compute the product for each label:
         #B = tf.reduce_prod(A, [1, 2]) # less stable
-        B = tf.reduce_logsumexp(A_no_padding_minus_l, [1, 2])  # more stable
+        #B = tf.reduce_logsumexp(A_no_padding_minus_l, [1, 2])  # more stable
+        B = tf.reduce_sum(tf.log(A_no_padding_minus_l), axis=[1,2])
 
         # Create a tensor where each cell contains the product for its boundary clique_indx and its label l:
         C1 = tf.stack([B] * (h * w))
@@ -149,7 +138,7 @@ def _compute_containment_update(q_values,containment_low_weights,containment_hig
         return index+1, prod_tensor_io, q_val_sum_tensor
 
     cond = lambda i, prod_tensor_io, q_val_sum_tensor: tf.less(i, len(sp_indices))
-    res = tf.while_loop(cond, while_body, [i, prod_tensor_io, q_val_sum_tensor], parallel_iterations=len(sp_indices), back_prop=False)
+    i, prod_tensor_io, q_val_sum_tensor = tf.while_loop(cond, while_body, [i, prod_tensor_io, q_val_sum_tensor], parallel_iterations=len(sp_indices), back_prop=False)
     
     # Add 1 to q_val_sum_tensor where it is 0
     bool_sum_zero = tf.equal(q_val_sum_tensor, 0)
@@ -157,12 +146,13 @@ def _compute_containment_update(q_values,containment_low_weights,containment_hig
     q_val_sum_tensor += bool_sum_one
 
     # the actual product: we need to divide it by each index's q_val(r,c,l) + q_val(r,c,l')
-    first_term = tf.divide(tf.to_float(prod_tensor_io), q_val_sum_tensor)
-    containment_low_weights_duplicated = tf.transpose(tf.stack([containment_low_weights] * (h * w))) # tf.stack
-
-    first_term_resp = tf.multiply(containment_low_weights_duplicated, tf.reshape(first_term, (c,-1)))
+    #first_term = tf.divide(tf.to_float(prod_tensor_io), q_val_sum_tensor)
+    first_term_cont_unexp = tf.subtract(tf.to_float(prod_tensor_io), tf.log(q_val_sum_tensor + 0.00001)) # may not need to add epsilon here
+    first_term_cont = tf.exp(first_term_unexp)
+    containment_low_weights_duplicated = tf.transpose(tf.stack([containment_low_weights] * (h * w)))
+    first_term_resp = tf.multiply(containment_low_weights_duplicated, tf.reshape(first_term_cont, (c,-1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-    containment_update = first_term_resp_back + containment_high_weights * (tf.ones(shape=(c,h,w)) - first_term)
+    containment_update = first_term_resp_back + containment_high_weights * (tf.ones(shape=(c,h,w)) - first_term_cont)
 
     return containment_update
 
@@ -177,8 +167,10 @@ def _compute_attachment_update(q_values,attachment_low_weights,attachment_high_w
         
         # Get locations of first sp in clique
         bool_sp_indx1 = tf.equal(extended_att_map, index_l1)
-        A1 = tf.multiply(tf.to_float(bool_sp_indx1), q_values)  # + tf.to_float(tf.logical_not(bool_sp_indx1))
-        B1 = tf.reduce_logsumexp(A1, [1, 2])
+        A1 = tf.multiply(tf.to_float(bool_sp_indx1), q_values + 0.00001) + tf.to_float(tf.logical_not(bool_sp_indx1))
+        #B1 = tf.reduce_logsumexp(A1, [1, 2])
+        B1 = tf.reduce_sum(tf.log(A1), axis=[1,2])
+        
         C1_1 = tf.stack([B1] * (h * w))
         C1_2 = tf.reshape(tf.transpose(C1_1), (c, h, w))
         C1_3 = tf.multiply(tf.to_float(bool_sp_indx1), C1_2)
@@ -190,10 +182,10 @@ def _compute_attachment_update(q_values,attachment_low_weights,attachment_high_w
             bool_sp_indx2 = tf.equal(extended_att_map, index_l2)
             
             # Don't put 1 in q_values anymore if doesn't belong to this clique
-            A2 = tf.multiply(tf.to_float(bool_sp_indx2), q_values)  # + tf.to_float(tf.logical_not(bool_sp_indx2))
+            A2 = tf.multiply(tf.to_float(bool_sp_indx2), q_values + 0.00001) + tf.to_float(tf.logical_not(bool_sp_indx2))
 
-            B2 = tf.reduce_logsumexp(A2, [1, 2])
-            
+            #B2 = tf.reduce_logsumexp(A2, [1, 2])
+            B2 = tf.reduce_sum(tf.log(A2), axis=[1,2])
             # Create tensor containing products for each cell
             C2_1 = tf.stack([B2] * (h * w))
             C2_2 = tf.reshape(tf.transpose(C2_1), (c, h, w))
@@ -203,23 +195,26 @@ def _compute_attachment_update(q_values,attachment_low_weights,attachment_high_w
             prod_tensor_att += C1_3 + C2_3
             return l2+1, prod_tensor_att
 
-        inner_res = tf.while_loop(inner_cond, inner_while_body, [l2, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
+        l2, prod_tensor_att = tf.while_loop(inner_cond, inner_while_body, [l2, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
         return l1+1, prod_tensor_att
 
     l1 = 0
     cond = lambda l1, prod_tensor_att: tf.less(l1, len(sp_indices))
-    res = tf.while_loop(cond, while_body, [l1, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
+    l1, prod_tensor_att = tf.while_loop(cond, while_body, [l1, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
     
     # Avoid division by zero from q_values
     bool_sum_zero = tf.equal(q_values, 0)
     bool_sum_one = tf.to_float(bool_sum_zero)
     q_values_modified = q_values + bool_sum_one
 
-    first_term = tf.divide(tf.to_float(prod_tensor_att), q_values_modified)
+    #first_term = tf.divide(tf.to_float(prod_tensor_att), q_values_modified)
+    first_term_att_unexp = tf.subtract(tf.to_float(prod_tensor_att), tf.log(q_values_modified + 0.00001))
+    first_term_att = tf.exp(first_term_att_unexp)
+    
     att_low_weights_duplicated = tf.transpose(tf.stack([attachment_low_weights] * (h * w)))
-    first_term_resp = tf.multiply(att_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+    first_term_resp = tf.multiply(att_low_weights_duplicated, tf.reshape(first_term_att, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-    attachment_update = first_term_resp_back + attachment_high_weights * (tf.ones(shape=(c, h, w)) - first_term)
+    attachment_update = first_term_resp_back + attachment_high_weights * (tf.ones(shape=(c, h, w)) - first_term_att)
 
     return attachment_update
 
@@ -249,7 +244,7 @@ def _compute_combined_update(q_values,low_weights,high_weights,sp_map,sp_indices
         # This will put True where where sp index is sp_indx, False otherwise:
         cond_sp_indx = tf.equal(extended_sp_map, index_l1)
 
-        q_val_for_clique = tf.multiply(tf.to_float(cond_sp_indx), q_values)
+        q_val_for_clique = tf.multiply(tf.to_float(cond_sp_indx), q_values + 0.00001)
         # put 1 in q_vals if a pixel is not in sp_indx:
         q_val_for_clique_padded = q_val_for_clique + tf.to_float(tf.logical_not(cond_sp_indx))
 
@@ -272,8 +267,9 @@ def _compute_combined_update(q_values,low_weights,high_weights,sp_map,sp_indices
 
         # ---- SP --------
         # compute the product for each label:
-        B_sp = tf.reduce_logsumexp(q_val_for_clique, [1, 2])
-
+        #B_sp = tf.reduce_logsumexp(q_val_for_clique, [1, 2])
+        B_sp = tf.reduce_sum(tf.log(q_val_for_clique_padded), axis=[1,2])
+        
         # Create a tensor where each cell contains the product for its superpixel l1 and its label l:
         C_sp_1 = tf.stack([B_sp] * (h * w))
         C_sp_2 = tf.reshape(tf.transpose(C_sp_1), (c, h, w))
@@ -284,8 +280,9 @@ def _compute_combined_update(q_values,low_weights,high_weights,sp_map,sp_indices
 
         # ----- CONT -------
         # compute the product for each label:
-        B_cont = tf.reduce_logsumexp(A_no_padding_sub_l, [1, 2])
-
+        #B_cont = tf.reduce_logsumexp(A_no_padding_sub_l, [1, 2])
+        B_cont = tf.reduce_sum(tf.log(A_no_padding_sub_l), axis=[1,2])
+        
         # Create a tensor where each cell contains the product for its boundary clique_indx and its label l:
         C_cont_1 = tf.stack([B_cont] * (h * w))
         C_cont_2 = tf.reshape(tf.transpose(C_cont_1), (c, h, w))
@@ -303,11 +300,11 @@ def _compute_combined_update(q_values,low_weights,high_weights,sp_map,sp_indices
             index_l2 = tf.to_float(l2)
             cond_sp_indx2 = tf.equal(extended_sp_map, index_l2)
             # Don't put 1 in q_values anymore if doesn't belong to this clique
-            q_val_for_clique2 = tf.multiply(tf.to_float(cond_sp_indx2), q_values)  # + tf.to_float(tf.logical_not(bool_sp_indx2))
+            q_val_for_clique2 = tf.multiply(tf.to_float(cond_sp_indx2), q_values+ 0.00001) + tf.to_float(tf.logical_not(bool_sp_indx2))
             
             # Compute product for each cell in sp2:
-            B_sp2 = tf.reduce_logsumexp(q_val_for_clique2, [1, 2])
-            
+            #B_sp2 = tf.reduce_logsumexp(q_val_for_clique2, [1, 2])
+            B_sp2 = tf.reduce_sum(tf.log(q_val_for_clique2), axis=[1,2])
             # Create tensor containing products for each cell
             C_sp2_1 = tf.stack([B_sp2] * (h * w))
             C_sp2_2 = tf.reshape(tf.transpose(C_sp2_1), (c, h, w))
@@ -318,11 +315,11 @@ def _compute_combined_update(q_values,low_weights,high_weights,sp_map,sp_indices
 
             return l2+1, prod_tensor_att
 
-        inner_res = tf.while_loop(inner_cond, inner_while_body, [l2, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
+        l2, prod_tensor_att = tf.while_loop(inner_cond, inner_while_body, [l2, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
 
         return l1+1, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor, prod_tensor_att
 
-    res = tf.while_loop(cond, while_body, [l1, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
+    l1, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor, prod_tensor_att = tf.while_loop(cond, while_body, [l1, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor, prod_tensor_att], parallel_iterations=len(sp_indices), back_prop=False)
             
     # modified q_values: (Avoid division by zero from q_values)
     bool_sum_zero = tf.equal(q_values, 0)
@@ -338,24 +335,33 @@ def _compute_combined_update(q_values,low_weights,high_weights,sp_map,sp_indices
     # compute update:
     # sp:
     # the actual product: we need to divide it by each index's q_val(r,c,l)
-    first_term = tf.divide(tf.to_float(prod_tensor_sp), q_values_modified)
+    #first_term = tf.divide(tf.to_float(prod_tensor_sp), q_values_modified)
+    first_term_sp_unexp = tf.subtract(tf.to_float(prod_tensor_sp), tf.log(q_values_modified + 0.00001)) # might not be necessary to add epsilon here
+    first_term_sp = tf.exp(first_term_sp_unexp)
+    
     superpixel_low_weights_duplicated = tf.transpose(tf.stack([low_weights[0]] * (h * w)))
-    first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+    #superpixel_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[0], (1,))))
+    first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term_sp, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-    superpixel_update = first_term_resp_back + high_weights[0] * (tf.ones(shape=(c, h, w)) - first_term)
+    superpixel_update = first_term_resp_back + high_weights[0] * (tf.ones(shape=(c, h, w)) - first_term_sp)
     # cont:
     # the actual product: we need to divide it by each index's q_val(r,c,l) + q_val(r,c,l')
-    first_term = tf.divide(tf.to_float(prod_tensor_io), q_val_sum_tensor)
+    #first_term = tf.divide(tf.to_float(prod_tensor_io), q_val_sum_tensor)
+    first_term_cont_unexp = tf.subtract(tf.to_float(prod_tensor_io), tf.log(q_val_sum_tensor + 0.00001))
+    first_term_cont = tf.exp(first_term_cont_unexp)
     containment_low_weights_duplicated = tf.transpose(tf.stack([low_weights[1]] * (h * w)))
-    first_term_resp = tf.multiply(containment_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+    first_term_resp = tf.multiply(containment_low_weights_duplicated, tf.reshape(first_term_cont, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-    containment_update = first_term_resp_back + high_weights[1] * (tf.ones(shape=(c, h, w)) - first_term)
+    containment_update = first_term_resp_back + high_weights[1] * (tf.ones(shape=(c, h, w)) - first_term_cont)
     # att:
-    first_term = tf.divide(tf.to_float(prod_tensor_att), q_values_modified)
+    #first_term = tf.divide(tf.to_float(prod_tensor_att), q_values_modified)
+    first_term_att_unexp = tf.subtract(tf.to_float(prod_tensor_att), tf.log(q_values_modified + 0.00001))
+    first_term_att = tf.exp(first_term_att_unexp)
+    
     att_low_weights_duplicated = tf.transpose(tf.stack([low_weights[2]] * (h * w)))
-    first_term_resp = tf.multiply(att_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+    first_term_resp = tf.multiply(att_low_weights_duplicated, tf.reshape(first_term_att, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-    attachment_update = first_term_resp_back + high_weights[2] * (tf.ones(shape=(c, h, w)) - first_term)
+    attachment_update = first_term_resp_back + high_weights[2] * (tf.ones(shape=(c, h, w)) - first_term_att)
 
     return superpixel_update + containment_update + attachment_update
 
@@ -364,7 +370,6 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
     # replicate the sp_map m times and have the shape of [rows,cols,m), where m in the number of labels
     #extended_sp_map = tf.stack([sp_map] * c)
     extended_sp_map = tf.tile(tf.reshape(sp_map, [1, h, w]), [c, 1, 1])
-
     # sp:
     prod_tensor_sp = tf.zeros(shape=(c, h, w))
 
@@ -378,7 +383,7 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
         # This will put True where where sp index is sp_indx, False otherwise:
         cond_sp_indx = tf.equal(extended_sp_map, sp_indx)
 
-        q_val_for_clique = tf.multiply(tf.to_float(cond_sp_indx), q_values)
+        q_val_for_clique = tf.multiply(tf.to_float(cond_sp_indx), q_values + 0.00001)
         # put 1 in q_vals if a pixel is not in sp_indx:
         q_val_for_clique_padded = q_val_for_clique + tf.to_float(tf.logical_not(cond_sp_indx))
 
@@ -401,11 +406,12 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
 
         # ---- SP --------
         # compute the product for each label:
-        B_sp = tf.reduce_logsumexp(q_val_for_clique, [1, 2])
+        #B_sp = tf.reduce_logsumexp(q_val_for_clique, [1, 2])
+        B_sp = tf.reduce_sum(tf.log(q_val_for_clique), axis=[1,2])
 
         # Create a tensor where each cell contains the product for its superpiel sp_indx and its label l:
         #C_sp1 = tf.stack([B_sp] * (h * w))
-        C_sp1 = tf.tile(tf.reshape(B_sp, [1, 6]), [h * w, 1])
+        C_sp1 = tf.tile(tf.reshape(B_sp, [1,6]), [h*w, 1])
         C_sp2 = tf.reshape(tf.transpose(C_sp1), (c, h, w))
         C_sp3 = tf.multiply(tf.to_float(cond_sp_indx), C_sp2)  ## (using tf.tensordot rather than tf.multiply
 
@@ -414,11 +420,11 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
 
         # ----- CONT -------
         # compute the product for each label:
-        B_cont = tf.reduce_logsumexp(A_no_padding_sub_l, [1, 2])
-
+        #B_cont = tf.reduce_logsumexp(A_no_padding_sub_l, [1, 2])
+        B_cont = tf.reduce_sum(tf.log(A_no_padding_sub_l), axis=[1,2])
         # Create a tensor where each cell contains the product for its boundary clique_indx and its label l:
         #C_cont1 = tf.stack([B_cont] * (h * w))
-        C_cont1 = tf.tile(tf.reshape(B_cont, [1, 6]), [h * w, 1])
+        C_cont1 = tf.tile(tf.reshape(B_cont, [1,6]), [h*w, 1])
         C_cont2 = tf.reshape(tf.transpose(C_cont1), (c, h, w))
         C_cont3 = tf.multiply(tf.to_float(cond_sp_indx), C_cont2)
 
@@ -429,7 +435,7 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
 
     i=0
     cond = lambda i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor: tf.less(i, len(sp_indices))
-    i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor = tf.while_loop(cond, while_body, [i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor], parallel_iterations=len(sp_indices), back_prop=False)
+    i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor = tf.while_loop(cond, while_body, [i, prod_tensor_sp, prod_tensor_io, q_val_sum_tensor], parallel_iterations=len(sp_indices))
 
     # modified q_values: (Avoid division by zero from q_values)
     bool_sum_zero = tf.equal(q_values, 0)
@@ -445,18 +451,22 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
     # compute update:
     # sp:
     # the actual product: we need to divide it by each index's q_val(r,c,l)
-    first_term = tf.divide(tf.to_float(prod_tensor_sp), q_values_modified)
-    print(low_weights)
+    #first_term = tf.divide(tf.to_float(prod_tensor_sp), q_values_modified)
+    first_term_sp_unexp = tf.subtract(tf.to_float(prod_tensor_sp), tf.log(q_values_modified + 0.00001))
+    first_term_sp = tf.exp(first_term_sp_unexp)
     #superpixel_low_weights_duplicated = tf.transpose(tf.stack([low_weights[0]] * (h * w)))
-    superpixel_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[0], [1, 6]), [h * w, 1]))
+    superpixel_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[0], [1,6]), [h*w,1]))
+    #superpixel_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(superpixel_low_weights, [1,6]), [h*w, 1]))
     first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
     superpixel_update = first_term_resp_back + high_weights[0] * (tf.ones(shape=(c, h, w)) - first_term)
     # cont:
     # the actual product: we need to divide it by each index's q_val(r,c,l) + q_val(r,c,l')
-    first_term = tf.divide(tf.to_float(prod_tensor_io), q_val_sum_tensor)
+    #first_term = tf.divide(tf.to_float(prod_tensor_io), q_val_sum_tensor)
+    first_term_cont_unexp = tf.subtract(tf.to_float(prod_tensor_io), tf.log(q_val_sum_tensor + 0.00001))
+    first_term_cont = tf.exp(first_term_cont_unexp)
     #containment_low_weights_duplicated = tf.transpose(tf.stack([low_weights[1]] * (h * w)))
-    containment_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[1], [1, 6]), [h * w, 1]))
+    containment_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[1], [1,6], [h*w,1])))
     first_term_resp = tf.multiply(containment_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
     containment_update = first_term_resp_back + high_weights[1] * (tf.ones(shape=(c, h, w)) - first_term)
@@ -466,8 +476,8 @@ def _compute_superpixel_and_containment_update(q_values,low_weights,high_weights
 def _compute_superpixel_and_attachment_update(q_values, low_weights, high_weights, sp_map, sp_indices, c, h, w ):
 
     # replicate the sp_map m times and have the shape of [rows,cols,m), where m in the number of labels
-    extended_sp_map = tf.tile(tf.reshape(sp_map, [1,h,w]), [c,1,1])
-    #extended_sp_map = tf.stack([sp_map] * c)
+    extended_sp_map = tf.stack([sp_map] * c)
+    #extended_sp_map = tf.tile(tf.reshape(sp_map, [1,h,w]), [c,1,1])
 
     # sp:
     prod_tensor_sp = tf.zeros(shape=(c, h, w))
@@ -482,21 +492,20 @@ def _compute_superpixel_and_attachment_update(q_values, low_weights, high_weight
         # This will put True where where sp index is sp_indx, False otherwise:
         cond_sp_indx = tf.equal(extended_sp_map, index_l1)
 
-        q_val_for_clique = tf.multiply(tf.to_float(cond_sp_indx), q_values)
+        q_val_for_clique = tf.multiply(tf.to_float(cond_sp_indx), q_values + 0.00001)
         # put 1 in q_vals if a pixel is not in sp_indx:
         q_val_for_clique_padded = q_val_for_clique + tf.to_float(tf.logical_not(cond_sp_indx))
 
         # ---- SP --------
         # compute the product for each label:
-        B_sp = tf.reduce_logsumexp(q_val_for_clique, [1, 2])
+        #B_sp = tf.reduce_logsumexp(q_val_for_clique, [1, 2])
+        B_sp = tf.reduce_sum(tf.log(q_val_for_clique_padded), axis=[1,2])
 
         # Create a tensor where each cell contains the product for its superpiel sp_indx and its label l:
-        C_sp1 = tf.tile(tf.reshape(B_sp, [1, 6]), [h*w, 1])
-        #C_sp1 = tf.stack([B_sp] * (h * w))
+        C_sp1 = tf.stack([B_sp] * (h * w))
+        #C_sp1 = tf.tile(tf.reshape(B_sp, [1, 6]), [h*w, 1])
         C_sp2 = tf.reshape(tf.transpose(C_sp1), (c, h, w))
         C_sp3 = tf.multiply(tf.to_float(cond_sp_indx), C_sp2)  ## (using tf.tensordot rather than tf.multiply
-
-        C_sp3 = tf.multiply(tf.to_float(cond_sp_indx), tf.reshape(tf.transpose(tf.stack([B_sp]*(h*w))), (c,h,w)))
 
         # add this to the overall product tensor; each cell contains the 'product' for its update rule:
         prod_tensor_sp += C_sp3
@@ -508,19 +517,17 @@ def _compute_superpixel_and_attachment_update(q_values, low_weights, high_weight
             # compute sp info
             index_l2 = tf.to_float(l2)
             cond_sp_indx2 = tf.equal(extended_sp_map, index_l2)
-            # Don't put 1 in q_values anymore if doesn't belong to this clique
-            q_val_for_clique2 = tf.multiply(tf.to_float(cond_sp_indx2), q_values)  # + tf.to_float(tf.logical_not(bool_sp_indx2))
+            q_val_for_clique2 = tf.multiply(tf.to_float(cond_sp_indx2), q_values + 0.00001) + tf.to_float(tf.logical_not(bool_sp_indx2))
             
             # Compute product for each cell in sp2:
-            B_sp2 = tf.reduce_logsumexp(q_val_for_clique2, [1, 2])
+            #B_sp2 = tf.reduce_logsumexp(q_val_for_clique2, [1, 2])
+            B_sp2 = tf.reduce_sum(tf.log(q_val_for_clique2), axis=[1,2])
             
             # Create tensor containing products for each cell
-            C_sp2_1 = tf.tile(tf.reshape(B_sp2, [1,6]), [h*w, 1])
-            #C_sp2_1 = tf.stack([B_sp2] * (h * w))
+            C_sp2_1 = tf.stack([B_sp2] * (h * w))
+            #C_sp2_1 = tf.tile(tf.reshape(B_sp2, [1,6]), [h*w, 1])
             C_sp2_2 = tf.reshape(tf.transpose(C_sp2_1), (c, h, w))
             C_sp2_3 = tf.multiply(tf.to_float(cond_sp_indx2), C_sp2_2)  ## (using tf.tensordot rather than tf.multiply
-
-            #C_sp2_3 = tf.multiply(tf.to_float(cond_sp_indx2), tf.reshape(tf.transpose(tf.stack([B_sp2]*(h*w))), (c, h, w)))
             
             # Add to overall product
             prod_tensor_att += C_sp3 + C_sp2_3
@@ -541,19 +548,23 @@ def _compute_superpixel_and_attachment_update(q_values, low_weights, high_weight
     # compute update:
     # sp:
     # the actual product: we need to divide it by each index's q_val(r,c,l)
-    first_term = tf.divide(tf.to_float(prod_tensor_sp), q_values_modified)
-    #superpixel_low_weights_duplicated = tf.transpose(tf.stack([low_weights[0]] * (h * w)))
-    superpixel_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[0], [1,6]), [h*w, 1]))
-    first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+    #first_term = tf.divide(tf.to_float(prod_tensor_sp), q_values_modified)
+    first_term_sp_unexp = tf.subtract(tf.to_float(prod_tensor_sp), tf.log(q_values_modified + 0.00001))
+    first_term_sp = tf.exp(first_term_sp_unexp)
+    superpixel_low_weights_duplicated = tf.transpose(tf.stack([low_weights[0]] * (h * w)))
+    #superpixel_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[0], [1,6]), [h*w, 1]))
+    first_term_resp = tf.multiply(superpixel_low_weights_duplicated, tf.reshape(first_term_sp, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-    superpixel_update = first_term_resp_back + high_weights[0] * (tf.ones(shape=(c, h, w)) - first_term)
+    superpixel_update = first_term_resp_back + high_weights[0] * (tf.ones(shape=(c, h, w)) - first_term_sp)
     # att:
-    first_term = tf.divide(tf.to_float(prod_tensor_att), q_values_modified)
-    #   att_low_weights_duplicated = tf.transpose(tf.stack([low_weights[1]] * (h * w)))
-    att_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[1], [1,6]), [h*w, 1]))
-    first_term_resp = tf.multiply(att_low_weights_duplicated, tf.reshape(first_term, (c, -1)))
+    #first_term = tf.divide(tf.to_float(prod_tensor_att), q_values_modified)
+    first_term_att_unexp = tf.subtract(tf.to_float(prod_tensor_att), tf.log(q_values_modified + 0.00001))
+    first_term_att = tf.exp(first_term_att_unexp)
+    att_low_weights_duplicated = tf.transpose(tf.stack([low_weights[1]] * (h * w)))
+    #att_low_weights_duplicated = tf.transpose(tf.tile(tf.reshape(low_weights[1], [1,6]), [h*w, 1]))
+    first_term_resp = tf.multiply(att_low_weights_duplicated, tf.reshape(first_term_att, (c, -1)))
     first_term_resp_back = tf.reshape(first_term_resp, (c, h, w))
-    attachment_update = first_term_resp_back + high_weights[1] * (tf.ones(shape=(c, h, w)) - first_term)
+    attachment_update = first_term_resp_back + high_weights[1] * (tf.ones(shape=(c, h, w)) - first_term_att)
 
     return superpixel_update + attachment_update
 
@@ -613,98 +624,10 @@ class CrfRnnLayerSP(Layer):
 
         super(CrfRnnLayerSP, self).build(input_shape)
 
-    """
     def call(self, inputs):
-        unary_list, rgb_list, sp_list = [], [], []
-
-        for j in range(self.batch_size):
-            unary_list.append(tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1))) # the fcn_scores
-            rgb_list.append(tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1))) # the raw rgb
-            sp_list.append(tf.transpose(inputs[2][0,:,:]))  # perm=(0,1)
-
-        unaries_tensor = tf.stack(unary_list)
-        rgb_tensor = tf.stack(rgb_list)
-        sp_tensor = tf.stack(sp_list)
-        
-        indexed_arr = np.ones(shape=(self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1]))
-        for m in range(self.batch_size):
-            indexed_arr[m] = m
-        indexed_tensor = tf.convert_to_tensor(indexed_arr, np.float32)
-        
-        k = 0
-        def cond(k, q_values_tensor):
-            return tf.less(k, self.batch_size)
-        q_values_tensor = tf.zeros(shape=(self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1]))
-        
-        sp_indices = [range(500) for i in range(self.num_iterations)]
-        def while_body(k, q_values_tensor):
-            
-            unaries = unaries_tensor[k]
-            rgb = rgb_tensor[k]
-            superpixel_cliques = sp_tensor[k]
-
-            c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
-            
-            all_ones = np.ones((c, h, w), dtype=np.float32)
-            
-            # Prepare filter normalization coefficients
-            spatial_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=False,
-                                                              theta_gamma=self.theta_gamma)
-            
-            bilateral_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=True,
-                                                                theta_alpha=self.theta_alpha,
-                                                                theta_beta=self.theta_beta)
-            q_values = unaries
-            
-            for i in range(self.num_iterations):
-                softmax_out = tf.nn.softmax(q_values, 0)
-                
-                # Spatial filtering
-                spatial_out_undiv = custom_module.high_dim_filter(softmax_out, rgb, bilateral=False,
-                                                                  theta_gamma=self.theta_gamma)
-                spatial_out = spatial_out_undiv / spatial_norm_vals
-                
-                # Bilateral filtering
-                bilateral_out_undiv = custom_module.high_dim_filter(softmax_out, rgb, bilateral=True,
-                                                                    theta_alpha=self.theta_alpha,
-                                                                    theta_beta=self.theta_beta)
-                bilateral_out = bilateral_out_undiv / bilateral_norm_vals
-                
-                # compute superpixel potential update:
-                print(self.superpixel_low_weights)
-                superpixel_update = _compute_superpixel_update(softmax_out, self.superpixel_low_weights, self.superpixel_high_weight, superpixel_cliques, sp_indices[i], c, h, w)
-            
-                # Weighting filter outputs
-                message_passing = (tf.matmul(self.spatial_ker_weights,
-                                             tf.reshape(spatial_out, (c, -1))) +
-                                   tf.matmul(self.bilateral_ker_weights,
-                                             tf.reshape(bilateral_out, (c, -1)))
-                )
-                
-                # Compatibility transform
-                pairwise_unshaped = tf.matmul(self.compatibility_matrix, message_passing)
-                
-                # Adding unary potentials
-                pairwise = tf.reshape(pairwise_unshaped, (c, h, w))
-                
-                q_values = unaries - pairwise - superpixel_update
-
-            float_index = tf.to_float(k)
-            cond_indexed = tf.equal(indexed_tensor, float_index)
-            q_vals_stacked = tf.stack([q_values] * self.batch_size)
-            q_vals_for_index = tf.multiply(tf.to_float(cond_indexed), q_vals_stacked)
-            q_values_tensor += q_vals_for_index
-            return k+1, q_values_tensor
-        
-        res = tf.while_loop(cond, while_body, [k, q_values_tensor], parallel_iterations=self.batch_size)
-        return tf.transpose(tf.reshape(res[1], (self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1])), perm=(0,2,3,1))
-    """
-    # Serial older version for the call function
-    def call(self, inputs):
-
         unaries = tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1)) # the fcn_scores
         rgb = tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1)) # the raw rgb
-        superpixel_cliques = tf.transpose(inputs[2][0,:,:])  # perm=(0,1)
+        superpixel_cliques = tf.transpose(inputs[2][0,:,:])
 
         c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
 
@@ -718,9 +641,9 @@ class CrfRnnLayerSP(Layer):
                                                             theta_beta=self.theta_beta)
         q_values = unaries
 
-        #num_of_sp_samples = 1
-        #sp_indices = [random.sample(range(200, 400), num_of_sp_samples) for i in range(self.num_iterations)]
         sp_indices = [range(500) for i in range(self.num_iterations)]
+        #sp_indices=[range(1) for i in range(self.num_iterations)]
+        #t2 = time.time()
         for i in range(self.num_iterations):
             softmax_out = tf.nn.softmax(q_values, 0)
 
@@ -736,8 +659,11 @@ class CrfRnnLayerSP(Layer):
             bilateral_out = bilateral_out / bilateral_norm_vals
 
             # compute superpixel potential update:
+            #t0 = time.time()
             superpixel_update = _compute_superpixel_update(softmax_out, self.superpixel_low_weights, self.superpixel_high_weight, superpixel_cliques, sp_indices[i], c, h, w)
 
+            #t1 = time.time()
+            #print("time for sp update ", t1-t0)
             # Weighting filter outputs
             message_passing = (tf.matmul(self.spatial_ker_weights,
                                          tf.reshape(spatial_out, (c, -1))) +
@@ -752,12 +678,10 @@ class CrfRnnLayerSP(Layer):
             pairwise = tf.reshape(pairwise, (c, h, w))
 
             q_values = unaries - pairwise - superpixel_update
-            # for i in range(1):
-            #     q_values = tf.Print(q_values, [q_values[i]], message="q_values first 500 ", summarize=500)
 
-
+        #t3 = time.time()
+        #print("time for entire update ", t3-t2)
         return tf.transpose(tf.reshape(q_values, (1, c, h, w)), perm=(0, 2, 3, 1))
-
 
     def compute_output_shape(self, input_shape):
         return input_shape
@@ -934,92 +858,82 @@ class CrfRnnLayerSPAT(Layer):
         super(CrfRnnLayerSPAT, self).build(input_shape)
 
     def call(self, inputs):
-        unary_list, rgb_list, sp_list = [], [], [] # While loop
-        
+        '''
+        unary_list, rgb_list, sp_list, q_values_list = [], [], [], []
+
         for j in range(self.batch_size):
             unary_list.append(tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1)))
             rgb_list.append(tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1)))
             sp_list.append(tf.transpose(inputs[2][0,:,:]))
-
+        '''
+        unaries = tf.transpose(inputs[0][0, :, :, :], perm=(2, 0, 1)) # the fcn_scores
+        rgb = tf.transpose(inputs[1][0, :, :, :], perm=(2, 0, 1)) # the raw rgb
+        superpixel_cliques = tf.transpose(inputs[2][0,:,:])  # perm=(0,1)
+        '''
         unaries_tensor = tf.stack(unary_list)
         rgb_tensor = tf.stack(rgb_list)
         sp_tensor = tf.stack(sp_list)
-
-        indexed_arr = np.ones(shape=(self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1]))
-        for m in range(self.batch_size):
-            indexed_arr[m] = m
-        indexed_tensor = tf.convert_to_tensor(indexed_arr, np.float32)
         
+        #for j in range(self.batch_size):
         k = 0
-        def cond(k, q_values_tensor):
-            return tf.less(k, self.batch_size)
-        q_values_tensor = tf.zeros(shape=(self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1]))
-
-        sp_indices = [range(500) for i in range(self.num_iterations)]
-        def while_body(k, q_values_tensor):
-            
-            unaries = unaries_tensor[k]
-            rgb = rgb_tensor[k]
-            superpixel_cliques = sp_tensor[k]
-            
-            c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
-            
-            all_ones = np.ones((c, h, w), dtype=np.float32)
-            
-            # Prepare filter normalization coefficients
-            spatial_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=False,
-                                                              theta_gamma=self.theta_gamma)
-            
-            bilateral_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=True,
-                                                                theta_alpha=self.theta_alpha,
-                                                                theta_beta=self.theta_beta)
-            q_values = unaries
-
-            for i in range(self.num_iterations):
-                softmax_out = tf.nn.softmax(q_values, 0)
-                
-                # Spatial filtering
-                spatial_out_undiv = custom_module.high_dim_filter(softmax_out, rgb, bilateral=False,
-                                                            theta_gamma=self.theta_gamma)
-                spatial_out = spatial_out_undiv / spatial_norm_vals
-                
-                # Bilateral filtering
-                bilateral_out_undiv = custom_module.high_dim_filter(softmax_out, rgb, bilateral=True,
-                                                              theta_alpha=self.theta_alpha,
-                                                              theta_beta=self.theta_beta)
-                bilateral_out = bilateral_out_undiv / bilateral_norm_vals
-                
-                # compute containment potential update:
-                t0 = time.time()
-                print(self.complex_rel_low_weights[0])
-                attachment_update = _compute_superpixel_and_attachment_update(softmax_out, self.complex_rel_low_weights, self.complex_rel_high_weights, superpixel_cliques, sp_indices[i], c, h, w)
-                #print(attachment_update)
-                t1 = time.time()
-                #print("time ", t1-t0)
-                # Weighting filter outputs
-                message_passing = (tf.matmul(self.spatial_ker_weights,
-                                             tf.reshape(spatial_out, (c, -1))) +
-                                   tf.matmul(self.bilateral_ker_weights,
-                                             tf.reshape(bilateral_out, (c, -1)))
-                )
-                
-                # Compatibility transform
-                pairwise_unshaped = tf.matmul(self.compatibility_matrix, message_passing)
-                
-                # Adding unary potentials
-                pairwise = tf.reshape(pairwise_unshaped, (c, h, w))
-                
-                q_values = unaries - pairwise - attachment_update
-
-            float_index = tf.to_float(k)
-            cond_indexed = tf.equal(indexed_tensor, float_index)
-            q_vals_stacked = tf.stack([q_values] * self.batch_size)
-            q_vals_for_index = tf.multiply(tf.to_float(cond_indexed), q_vals_stacked)
-            q_values_tensor += q_vals_for_index
-            return k+1, q_values_tensor
+        cond = lambda k, q_values: k < self.batch_size
+        def while_loop(index):
         
-        res = tf.while_loop(cond, while_body, [k, q_values_tensor], parallel_iterations=self.batch_size)
-        return tf.transpose(tf.reshape(res[1], (self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1])), perm=(0,2,3,1))
+            unaries = unaries_tensor[j]
+            rgb = rgb_tensor[j]
+            superpixel_cliques = sp_tensor[j]
+        '''    
+        c, h, w = self.num_classes, self.image_dims[0], self.image_dims[1]
+        
+        all_ones = np.ones((c, h, w), dtype=np.float32)
+        
+        # Prepare filter normalization coefficients
+        spatial_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=False,
+                                                          theta_gamma=self.theta_gamma)
+        bilateral_norm_vals = custom_module.high_dim_filter(all_ones, rgb, bilateral=True,
+                                                            theta_alpha=self.theta_alpha,
+                                                            theta_beta=self.theta_beta)
+        q_values = unaries
+        
+        sp_indices = [range(500) for i in range(self.num_iterations)]
+        for i in range(self.num_iterations):
+            softmax_out = tf.nn.softmax(q_values, 0)
+            
+            # Spatial filtering
+            spatial_out = custom_module.high_dim_filter(softmax_out, rgb, bilateral=False,
+                                                        theta_gamma=self.theta_gamma)
+            spatial_out = spatial_out / spatial_norm_vals
+            
+            # Bilateral filtering
+            bilateral_out = custom_module.high_dim_filter(softmax_out, rgb, bilateral=True,
+                                                          theta_alpha=self.theta_alpha,
+                                                          theta_beta=self.theta_beta)
+            bilateral_out = bilateral_out / bilateral_norm_vals
+            
+            t0 = time.time()
+            attachment_update = _compute_superpixel_and_attachment_update(softmax_out, self.complex_rel_low_weights, self.complex_rel_high_weights, superpixel_cliques, sp_indices[i], c, h, w)
+            t1 = time.time()
+            print("time ", t1-t0)
+            # Weighting filter outputs
+            message_passing = (tf.matmul(self.spatial_ker_weights,
+                                         tf.reshape(spatial_out, (c, -1))) +
+                               tf.matmul(self.bilateral_ker_weights,
+                                         tf.reshape(bilateral_out, (c, -1)))
+            )
+            
+            # Compatibility transform
+            pairwise = tf.matmul(self.compatibility_matrix, message_passing)
+            
+            # Adding unary potentials
+            pairwise = tf.reshape(pairwise, (c, h, w))
+            
+            q_values = unaries - pairwise - attachment_update
+            
+            #q_values_list.append(q_values)
+
+        #l = tf.stack(q_values_list)
+        #return tf.transpose(tf.reshape(l, (self.batch_size, self.num_classes, self.image_dims[0], self.image_dims[1])), perm=(0,2,3,1))
+        return tf.transpose(tf.reshape(q_values, (1, c, h, w)), perm=(0, 2, 3, 1))
 
     def compute_output_shape(self, input_shape):
         return input_shape
