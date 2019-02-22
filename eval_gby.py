@@ -80,15 +80,16 @@ if __name__ == '__main__':
     print(model_path_name)
     print('====================================================================================')
 
+    batchsize = 1
+    # if model.crf_flag:
+    #     batchsize = 1
+
     finetune_path = ''
-    model = load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path)
+    model = load_model_gby(model_name, INPUT_SIZE, nb_classes, num_crf_iterations, finetune_path, batchsize)
 
     #loading weights:
     model.load_weights(model_path_name)
 
-    batchsize = 6
-    if model.crf_flag:
-        batchsize = 1
 
     # ===============
     # ANALYZE model:
