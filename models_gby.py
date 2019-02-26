@@ -8,9 +8,10 @@ from keras.applications.resnet50 import ResNet50
 from utils_gby import bilinear_upsample_weights
 import sys
 sys.path.insert(1, './src')
-#from crfrnn_layer import CrfRnnLayer
-from crfrnn_layer_parallel import CrfRnnLayer
+from crfrnn_layer import CrfRnnLayer
+#from crfrnn_layer_parallel import CrfRnnLayer
 from crfrnn_layer_all import CrfRnnLayerAll, CrfRnnLayerSP, CrfRnnLayerSPIO, CrfRnnLayerSPAT
+import pdb
 
 # saved_model_path = '/storage/gby/semseg/streets_weights_resnet50fcn8s_2000ep'
 # saved_model_path = '/storage/gby/semseg/voc2012_weights_fcn_RESNET50_8s_500ep'
@@ -583,17 +584,17 @@ def fcn_RESNET50_8s_crfrnn(INPUT_SIZE, nb_classes, num_crf_iterations, finetune_
     crfrnn_output = CrfRnnLayer(image_dims=(height, weight),
                                 num_classes=nb_classes,
                                 theta_alpha=160.,
-                                theta_beta=90.,
+                                theta_beta=90., #3. (original), 90 (faster)
                                 theta_gamma=3.,
                                 batch_size=batch_size,
                                 num_iterations=num_crf_iterations,  # 10 for test, 5 for train
                                 name='crfrnn')([fcn_score, inputs])
 
     model = Model(inputs=inputs, outputs=crfrnn_output, name='fcn_RESNET50_8s_crfrnn')
-
-    # Fixing weighs in lower layers (optional)
-   # for layer in model.layers[:181]: #181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
-   #     layer.trainable = False
+    #pdb.set_trace()
+    # Fixing weights in lower layers (optional)
+    for layer in model.layers[:160]: #181]:  # 15,21,29 (overall 30 layers) feezing until layer pred 8 (182)
+        layer.trainable = False
 
     return model
 
