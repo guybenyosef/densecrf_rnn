@@ -37,14 +37,14 @@ def configure():
 	flags.DEFINE_string('valid_data_list', './dataset/horsecow_test.txt', 'validation data list filename')
 
 	# prediction / saving outputs for testing or validation
-	flags.DEFINE_string('out_dir', 'output', 'directory for saving outputs')
+	flags.DEFINE_string('out_dir', '/storage/gby/semseg/deepLabV2_output', 'directory for saving outputs')
 	flags.DEFINE_integer('test_step', 20000, 'checkpoint number for testing/validation')
 	flags.DEFINE_integer('test_num_steps', 216, '= number of testing/validation samples')
 	flags.DEFINE_string('test_data_list', './dataset/horsecow_test.txt', 'testing/validation data list filename')
 	flags.DEFINE_boolean('visual', True, 'whether to save predictions for visualization')
 
 	# data
-	flags.DEFINE_string('data_dir', '/om2/user/cfmata/crfasrnn_keras/data/horsecow_coarse_parts', 'data directory')
+	flags.DEFINE_string('data_dir', '/storage/cfmata/deeplab/openmind_copy/crfasrnn_keras/data/horsecow_coarse_parts', 'data directory')
 	flags.DEFINE_integer('batch_size', 1, 'training batch size PER GPU')
 	flags.DEFINE_integer('input_height', 321, 'input image height')
 	flags.DEFINE_integer('input_width', 321, 'input image width')
@@ -54,9 +54,9 @@ def configure():
 	flags.DEFINE_boolean('random_mirror', True, 'whether to perform random left-right flipping data-augmentation')
 	
 	# log
-	flags.DEFINE_string('modeldir', 'model_horsecowcoarse', 'model directory')
+	flags.DEFINE_string('modeldir', '/storage/gby/semseg/deepLabV2_output/model_horsecowcoarse', 'model directory')
 	flags.DEFINE_string('logfile', 'log.txt', 'training log filename')
-	flags.DEFINE_string('logdir', 'log', 'training log directory')
+	flags.DEFINE_string('logdir', '/storage/gby/semseg/deepLabV2_output/log', 'training log directory')
 	
 	flags.FLAGS.__dict__['__parsed'] = False
 	return flags.FLAGS

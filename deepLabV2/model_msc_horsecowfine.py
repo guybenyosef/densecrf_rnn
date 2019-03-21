@@ -38,7 +38,7 @@ class Model_msc(object):
     # train
     def train(self):
         self.train_setup()
-        gpu_list = get_available_gpus()
+        gpu_list = get_available_gpus() # [self.conf.gpu_index]   # get_available_gpus()
 
         self.sess.run(tf.global_variables_initializer())
 
@@ -46,10 +46,10 @@ class Model_msc(object):
         for i in range(len(gpu_list)):
             with tf.device(gpu_list[i]):
                 if self.conf.pretrain_file is not None:
-                    checkpointfile = 'deeplab_resnet_init.ckpt'
+                    #checkpointfile = 'deeplab_resnet_init.ckpt'
                     #checkpointfile = tf.train.latest_checkpoint("./model_msc_bs10/")
-                    self.load(self.loaders[0], checkpointfile)
-                    #self.load(self.loaders[0], self.conf.pretrain_file)
+                    #self.load(self.loaders[0], checkpointfile)
+                    self.load(self.loaders[0], self.conf.pretrain_file)
                 #print("done gpu ", i)
             
         # Save checkpoint right after loading pretrained

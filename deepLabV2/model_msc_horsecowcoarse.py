@@ -11,6 +11,7 @@ from network import *
 from utils.image_reader import ImageReader, read_labeled_image_list
 from utils.label_utils import decode_labels, prepare_label, inv_preprocess
 from utils.get_devices import get_available_gpus, average_gradients
+import pdb
 
 
 
@@ -45,7 +46,8 @@ class Model_msc(object):
         for i in range(len(gpu_list)):
             with tf.device(gpu_list[i]):
                 if self.conf.pretrain_file is not None:
-                    checkpointfile = tf.train.latest_checkpoint("./model_msc_bs10/")
+                    #checkpointfile = tf.train.latest_checkpoint("./model_msc_bs10/")
+                    checkpointfile = 'deeplab_resnet_init.ckpt'
                     self.load(self.loaders[0], checkpointfile)
                     #self.load(self.loaders[0], self.conf.pretrain_file)
                 #print("done gpu ", i)

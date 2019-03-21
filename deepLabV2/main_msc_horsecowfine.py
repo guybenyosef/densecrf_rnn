@@ -18,7 +18,8 @@ def configure():
 	# training
         # deeplab paper trains with batch size 10 for 20K iterations -> using batch size 2 means need 100K iterations
         # -> batch size 16 means 12.5K iterations
-	flags.DEFINE_integer('num_steps', 20000, 'maximum number of iterations')
+	#flags.DEFINE_integer('gpu_index', 3, 'gpu indx')
+	flags.DEFINE_integer('num_steps', 1000, 'maximum number of iterations') # 20000
 	flags.DEFINE_integer('save_interval', 1000, 'number of iterations for saving and visualization')
 	flags.DEFINE_integer('random_seed', 1234, 'random seed')
 	flags.DEFINE_float('weight_decay', 0.0005, 'weight decay rate')
@@ -26,7 +27,8 @@ def configure():
 	flags.DEFINE_float('power', 0.9, 'hyperparameter for poly learning rate')
 	flags.DEFINE_float('momentum', 0.9, 'momentum')
 	flags.DEFINE_string('encoder_name', 'deeplab', 'name of pre-trained model, res101, res50 or deeplab')
-	flags.DEFINE_string('pretrain_file', 'see model file', 'pre-trained model filename corresponding to encoder_name')
+	#flags.DEFINE_string('pretrain_file', 'see model file', 'pre-trained model filename corresponding to encoder_name')
+	flags.DEFINE_string('pretrain_file', '/storage/gby/semseg/deepLabV2_output/deeplab_resnet_init.ckpt', 'pre-trained model filename is latest checkout filenmae')
 	flags.DEFINE_string('data_list', './dataset/horsecow_train.txt', 'training data list filename')
 	flags.DEFINE_integer('grad_update_every', 1, 'gradient accumulation step') # very fast training with grad_update_every = 1, batch_size=2, number gpu 5
 	# Note: grad_update_every = true training batch size
@@ -37,14 +39,14 @@ def configure():
 	flags.DEFINE_string('valid_data_list', './dataset/horsecow_test.txt', 'validation data list filename')
 
 	# prediction / saving outputs for testing or validation
-	flags.DEFINE_string('out_dir', 'output', 'directory for saving outputs')
+	flags.DEFINE_string('out_dir', '/storage/gby/semseg/deepLabV2_output', 'directory for saving outputs')
 	flags.DEFINE_integer('test_step', 20000, 'checkpoint number for testing/validation')
 	flags.DEFINE_integer('test_num_steps', 216, '= number of testing/validation samples')
 	flags.DEFINE_string('test_data_list', './dataset/horsecow_test.txt', 'testing/validation data list filename')
 	flags.DEFINE_boolean('visual', True, 'whether to save predictions for visualization')
 
 	# data
-	flags.DEFINE_string('data_dir', './../crfasrnn_keras/data/horsecow_fine_parts', 'data directory')
+	flags.DEFINE_string('data_dir', '/storage/cfmata/deeplab/openmind_copy/crfasrnn_keras/data/horsecow_fine_parts', 'data directory')
 	flags.DEFINE_integer('batch_size', 2, 'training batch size PER GPU') # Can change to 1 if testing on single gpu
 	flags.DEFINE_integer('input_height', 321, 'input image height')
 	flags.DEFINE_integer('input_width', 321, 'input image width')
@@ -54,9 +56,9 @@ def configure():
 	flags.DEFINE_boolean('random_mirror', True, 'whether to perform random left-right flipping data-augmentation')
 	
 	# log
-	flags.DEFINE_string('modeldir', 'model_horsecowfine', 'model directory')
+	flags.DEFINE_string('modeldir', '/storage/gby/semseg/deepLabV2_output/model_horsecowfine', 'model directory')
 	flags.DEFINE_string('logfile', 'log.txt', 'training log filename')
-	flags.DEFINE_string('logdir', 'log', 'training log directory')
+	flags.DEFINE_string('logdir', '/storage/gby/semseg/deepLabV2_output/log', 'training log directory')
 	
 	flags.FLAGS.__dict__['__parsed'] = False
 	return flags.FLAGS
