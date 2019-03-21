@@ -1,0 +1,11 @@
+# Create train/val/test lists where inputs are encodings instead of images/labels
+
+def create_encoding_list_train(trainfile):
+    names = []
+    with open(trainfile, 'r') as f:
+        for line in f:
+            names.append(line[13:23])
+    print(names)
+
+if __name__ == "__main__":
+    create_encoding_list_train("train.txt")
