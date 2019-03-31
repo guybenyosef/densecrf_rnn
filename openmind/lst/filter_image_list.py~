@@ -1,0 +1,10 @@
+if __name__ == "__main__":
+    names = []
+    with open('horse_trainval.txt', 'r') as f:
+        for line in f:
+            names.append(line[13:24])
+
+    with open('horsecoarse_train.txt', 'w') as wf:
+        for name in names:
+            wf.write("%s\n" % name)
+    wf.close()
