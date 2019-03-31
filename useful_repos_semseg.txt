@@ -1,0 +1,5 @@
+https://github.com/dimimal/semantics_segmentation_of_urban_environments.git
+
+https://github.com/GeorgeSeif/Semantic-Segmentation-Suite
+
+https://github.com/qubvel/segmentation_models.git
