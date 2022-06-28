@@ -12,7 +12,8 @@ Eval/Test:
 $ python eval_gby.py -ds horsecoarse -w /storage/gby/semseg/horsecoarse_weights_fcn_RESNET50_8s_100ep
 
 ### Paper
-Parts of this work appear in: [Complex Relations in a Deep Structured Prediction Model for Fine Image Segmentation](https://arxiv.org/abs/1805.09462). 
+Parts of this work appear in [Complex Relations in a Deep Structured Prediction Model for Fine Image Segmentation](https://arxiv.org/abs/1805.09462).   
+
 For citation: 
 ```
 @article{mata2018complex,
